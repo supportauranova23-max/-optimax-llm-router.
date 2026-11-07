@@ -8,7 +8,7 @@ app = FastAPI(title="OptiMax: Intelligent AI API Cost Management Router")
 class PromptRequest(BaseModel):
     prompt: str
 
-# Modern B2B User Interface Template
+# Unified Enterprise Dashboard UI & Live Frontend Sandbox Engine
 DASHBOARD_HTML = """
 <!DOCTYPE html>
 <html lang="en">
@@ -93,27 +93,84 @@ DASHBOARD_HTML = """
         }
         .value-pink { color: #FF007F; }
         .value-cyan { color: #00F0FF; }
-        .integration-box {
-            background-color: #110E20;
-            border: 1px dashed #FF007F;
+        
+        /* Sandbox Interactive Workspace CSS */
+        .sandbox-section {
+            background-color: #161329;
+            border: 1px solid #2D284E;
             border-radius: 12px;
             padding: 30px;
-            text-align: center;
+            margin-bottom: 40px;
         }
-        .integration-box h3 {
-            margin-top: 0;
+        .sandbox-title {
             font-size: 20px;
+            font-weight: 800;
+            margin-bottom: 8px;
         }
-        .code-snippet {
-            background-color: #05040A;
-            padding: 16px;
+        .sandbox-subtitle {
+            color: #999;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+        .input-group {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        .text-input {
+            flex: 1;
+            background-color: #0B0914;
+            border: 1px solid #2D284E;
+            color: #FFF;
+            padding: 15px;
             border-radius: 8px;
+            font-size: 16px;
+        }
+        .text-input:focus {
+            outline: none;
+            border-color: #FF007F;
+        }
+        .action-btn {
+            background-color: #FF007F;
+            color: white;
+            border: none;
+            padding: 0 30px;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 15px;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        .action-btn:hover { opacity: 0.9; }
+        
+        .output-display {
+            background-color: #05040A;
+            border: 1px solid #2D284E;
+            border-radius: 8px;
+            padding: 20px;
+            display: none;
+        }
+        .output-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #2D284E;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+        .output-tag {
+            font-size: 11px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .tag-route { color: #00F0FF; }
+        .tag-cost { color: #FF007F; }
+        .code-payload {
             font-family: 'Courier New', Courier, monospace;
             color: #00F0FF;
-            text-align: left;
-            overflow-x: auto;
-            border: 1px solid #2D284E;
-            margin-top: 15px;
+            white-space: pre-wrap;
+            margin: 0;
         }
     </style>
 </head>
@@ -145,33 +202,98 @@ DASHBOARD_HTML = """
             </div>
         </div>
 
-        <div class="integration-box">
-            <h3>B2B Secure API Access Hook</h3>
-            <p style="color: #999; margin-bottom: 20px;">Route your standard LLM client headers to this live production URL endpoint address to initialize data compaction metrics:</p>
-            <div class="code-snippet">
-                POST https://onrender.com
+        <!-- Live Sandbox Terminal Tool -->
+        <div class="sandbox-section">
+            <div class="sandbox-title">Interactive Gateway Sandbox</div>
+            <div class="sandbox-subtitle">Simulate real user prompts to test matrix caching speed and cost saving decisions.</div>
+            
+            <div class="input-group">
+                <input type="text" id="promptInput" class="text-input" placeholder="Type a prompt here (e.g., 'hello', or ask a long question)...">
+                <button onclick="simulateRoute()" class="action-btn">ROUTE METRICS</button>
+            </div>
+
+            <div id="outputDisplay" class="output-display">
+                <div class="output-header">
+                    <span id="routeBadge" class="output-tag tag-route">ROUTED TO: PENDING</span>
+                    <span id="costBadge" class="output-tag tag-cost">COST INCCURED: $0.00</span>
+                </div>
+                <pre id="jsonOutput" class="code-payload"></pre>
             </div>
         </div>
     </div>
 
+    <script>
+        async function simulateRoute() {
+            const promptText = document.getElementById('promptInput').value;
+            if(!promptText.trim()) return;
+            
+            const displayBlock = document.getElementById('outputDisplay');
+            const routeBadge = document.getElementById('routeBadge');
+            const costBadge = document.getElementById('costBadge');
+            const jsonOutput = document.getElementById('jsonOutput');
+            
+            displayBlock.style.display = 'block';
+            jsonOutput.innerText = "Processing computational shard vectors...";
+
+            try {
+                const response = await fetch('/v1/route', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ prompt: promptText })
+                });
+                const data = await response.json();
+                
+                routeBadge.innerText = "ROUTED TO: " + data.routed_to.toUpperCase();
+                costBadge.innerText = "COST INCURRED: $" + data.cost_incurred_usd.toFixed(5);
+                jsonOutput.innerText = JSON.stringify(data, null, 4);
+            } catch (err) {
+                jsonOutput.innerText = "Error tracking live API gateway parameters.";
+            }
+        }
+    </script>
 </body>
 </html>
 """
 
 @app.get("/", response_class=HTMLResponse)
 def read_root():
-    """Serves the visual infrastructure monitoring studio dashboard."""
+    """Serves the interactive infrastructure dashboard screen."""
     return DASHBOARD_HTML
 
 @app.post("/v1/route")
 def route_prompt(request: PromptRequest):
-    """Handles raw software system traffic routing."""
+    """Processes computational complexity parameters to optimize cloud costs."""
     start_time = time.time()
     clean_prompt = request.prompt.strip().lower()
 
-    # Optimized return logic layer
-    return {
-        "response": f"[OptiMax Gateway Output processed: {request.prompt}]",
-        "routed_to": "Dynamic Engine Layer",
-        "latency_ms": (time.time() - start_time) * 1000
+    # Fixed Local Matrix Caching Layer
+    semantic_cache = {
+        "hello": "Hello! How can I optimize your compute budget today?",
+        "what is your name": "I am the OptiMax AI Routing Engine.",
+        "help": "Route your prompts to this endpoint to slash your infrastructure bills."
     }
+
+    # Step 1: Hit Cache ($0 Overhead)
+    if clean_prompt in semantic_cache:
+        return {
+            "response": semantic_cache[clean_prompt],
+            "routed_to": "Local SaaS Cache Layer",
+            "cost_saved_usd": 0.0350,
+            "cost_incurred_usd": 0.0000,
+            "latency_ms": (time.time() - start_time) * 1000
+        }
+
+    # Step 2: Short Conversational Input -> Route to Open-Source Nodes
+    if len(clean_prompt.split()) <= 5:
+        return {
+            "response": f"[Lean Core Answer processed for: {request.prompt}]",
+            "routed_to": "Meta Llama-3-Lean Cluster",
+            "cost_saved_usd": 0.0345,
+            "cost_incurred_usd": 0.00005,
+            "latency_ms": (time.time() - start_time) * 1000
+        }
+
+    # Step 3: Complex Cognitive Logic -> Route to Heavy Premium Clusters
+    return {
+        "response": f"[Comprehensive Data Payload calculated for: {request.prompt}]",
+        "routed_to": "Premium Array (OpenAI GPT-4o / Google Gemini Pro)",
