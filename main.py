@@ -215,7 +215,7 @@ DASHBOARD_HTML = """
             <div id="outputDisplay" class="output-display">
                 <div class="output-header">
                     <span id="routeBadge" class="output-tag tag-route">ROUTED TO: PENDING</span>
-                    <span id="costBadge" class="output-tag tag-cost">COST INCCURED: $0.00</span>
+                    <span id="costBadge" class="output-tag tag-cost">COST INCURRED: $0.00</span>
                 </div>
                 <pre id="jsonOutput" class="code-payload"></pre>
             </div>
