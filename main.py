@@ -5,6 +5,9 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel
 from typing import Optional
 
+# ---> ENTERPRISE DATA LAYER INTEGRATION
+from supabase import create_client, Client
+
 # ---> COGNISHIELD COGNITIVE INFRASTRUCTURE MIDDLEWARE
 from cognishield_layer import CogniShieldLayer
 
@@ -13,21 +16,16 @@ import stripe
 
 app = FastAPI(title="OptiMax: Intelligent AI API Cost Management Router")
 
-# Configure Stripe Secret Key from Environment Variables safely
+# Securely load system environmental variables
 stripe.api_key = os.environ.get("STRIPE_SECRET_KEY", "sk_test_mock_placeholder_key")
 YOUR_DOMAIN = os.environ.get("RENDER_EXTERNAL_URL", "http://localhost:8000")
 
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://supabase.co")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "your-anon-key-here")
+
+# Initialize persistent cloud database client connection
+supabase_db: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 shield = CogniShieldLayer()
-
-# Track simple simulated local request counts for non-paying users
-USER_USAGE_TRACKER = {}
-
-# Enterprise Tier mappings
-VALID_API_KEYS = {
-    "optx_live_dev_78x92": {"name": "Alpha Tech Ventures", "tier": "premium"},
-    "optx_live_scale_11a42": {"name": "Nexus AI Core", "tier": "premium"},
-    "optx_free_trial_user": {"name": "Standard Sandbox User", "tier": "free"}
-}
 
 class PromptRequest(BaseModel):
     prompt: str
@@ -77,7 +75,7 @@ DASHBOARD_HTML = """
         <div style="background: #21262d; padding: 20px; border-radius: 6px; border: 1px solid #30363d; margin-top: 20px; text-align: center;">
             <h3>Upgrade to Optimax Enterprise Unlimited</h3>
             <p>Unlock endless sub-token proxy calls, high-throughput dedicated clusters, and advanced fallback routing redundancy.</p>
-            <a class="btn-pay" href="/create-checkout-session">Upgrade Account via Stripe</a>
+            <a class="btn-pay" href="/create-checkout-session">Start 14-Day Free Trial</a>
         </div>
     </div>
 </body>
@@ -89,20 +87,28 @@ async def verify_api_key_and_billing(authorization: Optional[str] = Header(None)
         raise HTTPException(status_code=401, detail="Missing or malformed credentials structure.")
     token = authorization.split(" ")[1]
     
-    if token not in VALID_API_KEYS:
+    # Query Supabase Cloud Database for active enterprise signatures
+    response = supabase_db.table("optimax_tenants").select("*").eq("api_key", token).execute()
+    records = response.data
+    
+    if not records:
         raise HTTPException(status_code=403, detail="Unauthorized client signature detected.")
     
-    client_profile = VALID_API_KEYS[token]
+    # Grab the precise individual record mapping out of the list
+    client_profile = records[0]
     
-    # Enforce Billing Check
+    # Enforce Live Billing Check using Cloud Data Records
     if client_profile["tier"] == "free":
-        current_usage = USER_USAGE_TRACKER.get(token, 0)
-        if current_usage >= 5:
+        if client_profile["request_count"] >= 5:
             raise HTTPException(
                 status_code=402, 
                 detail="Payment Required: Free tier request allocation exhausted. Please upgrade via Stripe dashboard."
             )
-        USER_USAGE_TRACKER[token] = current_usage + 1
+        
+        # Atomically increment live usage metrics inside Supabase cloud database
+        supabase_db.table("optimax_tenants").update(
+            {"request_count": client_profile["request_count"] + 1}
+        ).eq("api_key", token).execute()
         
     return client_profile
 
@@ -121,13 +127,16 @@ async def create_checkout_session():
                         'product_data': {
                             'name': 'Optimax AI Router Enterprise Tier',
                         },
-                        'unit_amount': 4900, # $49.00 USD per month
+                        'unit_amount': 4900,
                         'recurring': {'interval': 'month'},
                     },
                     'quantity': 1,
                 },
             ],
             mode='subscription',
+            subscription_data={
+                'trial_period_days': 14,
+            },
             success_url=YOUR_DOMAIN + '/?session_id={CHECKOUT_SESSION_ID}',
             cancel_url=YOUR_DOMAIN + '/',
         )
@@ -147,10 +156,6 @@ async def optimize_and_route(request: PromptRequest, client_profile: dict = Depe
     
     return {
         "status": "success",
-        "tenant": client_profile["name"],
-        "tier_status": client_profile["tier"],
-        "router_metrics": {
-            "execution_overhead_ms": round(execution_overhead, 2),
-            "selected_upstream_shard": "gpt-4o-optimized-cluster-prod"
-        }
+        "tenant": client_profile["company_name"],
+        "latency_ms": round(execution_overhead, 2)
     }
