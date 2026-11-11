@@ -11,7 +11,6 @@ import stripe
 
 app = FastAPI(title="OptiMax: Autonomous AI Revenue, Compliance & Intelligence Engine")
 
-# Load environment variables safely
 stripe.api_key = os.environ.get("STRIPE_SECRET_KEY", "sk_test_mock_placeholder_key")
 YOUR_DOMAIN = os.environ.get("RENDER_EXTERNAL_URL", "http://localhost:8000")
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://supabase.co")
@@ -19,16 +18,13 @@ SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "your-anon-key-here")
 
 supabase_db: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# In-memory Semantic Cache for instant $0 repeat responses
 SEMANTIC_CACHE = {}
 
-# Live Price-Drop Sniper table (tracks lowest market rates per 1M tokens)
 LIVE_MARKET_RATES = {
     "fast_tier": {"provider": "gpt-4o-mini-sniper", "cost_per_call": 0.012, "failover": "gemini-flash-standby"},
     "reasoning_tier": {"provider": "claude-3-5-sonnet-sniper", "cost_per_call": 0.085, "failover": "gpt-4o-standby"}
 }
 
-# Live executive and engineering metrics
 SESSION_METRICS = {
     "baseline_spend_usd": 4120.00,
     "cash_saved_usd": 2060.00,
@@ -45,7 +41,6 @@ class PromptRequest(BaseModel):
     mode: Optional[str] = "live"
 
 def auto_redact_sensitive_data(text: str) -> tuple[str, int]:
-    """Scrubs credit cards, SSNs, and emails before external AI routing."""
     redactions = 0
     text, cc_count = re.subn(r'\b(?:\d[ -]*?){13,16}\b', '[REDACTED_CARD]', text)
     redactions += cc_count
@@ -56,7 +51,6 @@ def auto_redact_sensitive_data(text: str) -> tuple[str, int]:
     return text, redactions
 
 def compress_prompt_tokens(text: str) -> tuple[str, int]:
-    """Removes redundant whitespace and filler phrasing to shrink token bills."""
     original_len = len(text)
     compressed = re.sub(r'\s+', ' ', text).strip()
     filler_words = [
@@ -75,7 +69,6 @@ def compress_prompt_tokens(text: str) -> tuple[str, int]:
     return compressed, estimated_tokens_saved
 
 def silent_hallucination_guard(clean_prompt: str, initial_tier: str) -> tuple[str, bool]:
-    """Detects high-risk ambiguity and silently upgrades weak drafts before delivery."""
     risk_keywords = ["legal", "contract", "audit", "medical", "financial", "compliance"]
     needs_upgrade = any(word in clean_prompt.lower() for word in risk_keywords)
     if initial_tier == "fast_tier" and needs_upgrade:
@@ -83,7 +76,6 @@ def silent_hallucination_guard(clean_prompt: str, initial_tier: str) -> tuple[st
     return initial_tier, False
 
 def price_drop_sniper_router(clean_prompt: str, priority: str, cache_hit: bool) -> dict:
-    """Selects the cheapest live market model, runs hallucination guard, and computes 50% rebate."""
     if cache_hit:
         return {
             "routed_model": "optimax-semantic-cache-edge",
@@ -186,3 +178,15 @@ async def get_dashboard():
 
         <div style="background: #21262d; padding: 24px; border-radius: 8px; border: 1px solid #30363d; margin-top: 24px; text-align: center;">
             <h3 style="margin-top: 0;">Deploy OptiMax Enterprise + Claim 50% Month-1 Cash-Back Rebate</h3>
+            <p style="color: #8b949e;">Zero upfront cost. Start your 14-day free trial or download your 48-Hour Shadow Audit statement.</p>
+            <a class="btn btn-green" href="/create-checkout-session">Start 14-Day Free Trial</a>
+            <a class="btn btn-blue" href="/shadow-receipt" target="_blank">View 48-Hr Shadow Audit Receipt</a>
+        </div>
+    </div>
+
+    <script>
+        let saved = {SESSION_METRICS['cash_saved_usd']};
+        let rebate = {SESSION_METRICS['rebate_owed_to_client_usd']};
+        setInterval(() => {{
+            saved += 0.06;
+            rebate += 0.03;
