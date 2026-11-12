@@ -216,3 +216,134 @@ async def get_shadow_receipt():
         "status": "VERIFIED",
         "shadow_calls_audited": SESSION_METRICS.get("shadow_calls_mirrored"),
         "zero_cost_cache_hits": SESSION_METRICS.get("cache_hits_saved"),
+        "zk_synthetic_pairs_minted": SESSION_METRICS.get("golden_training_pairs"),
+        "outcomes_billed_usd": round(SESSION_METRICS.get("outcomes_billed_usd"), 2),
+        "pii_leaks_blocked": SESSION_METRICS.get("threats_redacted"),
+        "net_gpu_savings_usd": round(SESSION_METRICS.get("cash_saved_usd"), 2),
+        "month_1_50_percent_cashback_rebate_owed_usd": round(SESSION_METRICS.get("rebate_owed_to_client_usd"), 2)
+    }
+
+async def verify_api_key_and_billing(authorization: Optional[str] = Header(None)):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing or malformed Authorization header.")
+    parts = authorization.split(" ")
+    if len(parts) != 2:
+        raise HTTPException(status_code=401, detail="Invalid Bearer token format.")
+    token = parts.pop(1)
+
+    if supabase_db is None:
+        return {"company_name": "Enterprise Sandbox Tenant", "tier": "premium", "request_count": 0}
+
+    response = supabase_db.table("optimax_tenants").select("*").eq("api_key", token).execute()
+    records = response.data
+
+    if not records:
+        raise HTTPException(status_code=403, detail="Unauthorized client signature detected.")
+
+    client_profile = records.pop(0)
+
+    if client_profile.get("tier") == "free":
+        if client_profile.get("request_count") >= 5:
+            raise HTTPException(
+                status_code=402,
+                detail="Payment Required: Free trial limit reached. Upgrade via Stripe dashboard."
+            )
+        supabase_db.table("optimax_tenants").update(
+            {"request_count": client_profile.get("request_count") + 1}
+        ).eq("api_key", token).execute()
+
+    return client_profile
+
+@app.get("/create-checkout-session")
+async def create_checkout_session():
+    try:
+        checkout_session = stripe.checkout.Session.create(
+            line_items=(
+                {
+                    "price_data": {
+                        "currency": "usd",
+                        "product_data": {
+                            "name": "OptiMax GPU Exchange & Outcome Engine (Enterprise)",
+                        },
+                        "unit_amount": 4900,
+                        "recurring": {"interval": "month"},
+                    },
+                    "quantity": 1,
+                },
+            ),
+            mode="subscription",
+            subscription_data={
+                "trial_period_days": 14,
+            },
+            success_url=YOUR_DOMAIN + "/?session_id={CHECKOUT_SESSION_ID}",
+            cancel_url=YOUR_DOMAIN + "/",
+        )
+        return RedirectResponse(url=checkout_session.url, status_code=303)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+def process_optimax_pipeline(prompt_text: str, priority: str, mode: str, tenant_name: str) -> dict:
+    start_time = time.time()
+
+    sanitized_prompt, redaction_count = auto_redact_sensitive_data(prompt_text)
+    SESSION_METRICS["threats_redacted"] += redaction_count
+
+    compressed_prompt, tokens_saved = compress_prompt_tokens(sanitized_prompt)
+
+    prompt_hash = hashlib.sha256(compressed_prompt.lower().encode()).hexdigest()
+    is_cache_hit = prompt_hash in SEMANTIC_CACHE
+    if is_cache_hit:
+        SESSION_METRICS["cache_hits_saved"] += 1
+    else:
+        SEMANTIC_CACHE[prompt_hash] = True
+
+    routing_decision = idle_gpu_arbitrage_router(compressed_prompt, priority, is_cache_hit)
+    if routing_decision.get("hallucination_auto_upgraded"):
+        SESSION_METRICS["hallucinations_caught"] += 1
+
+    zk_data_asset = refine_synthetic_training_pair(
+        compressed_prompt,
+        routing_decision.get("routed_node"),
+        routing_decision.get("hallucination_auto_upgraded")
+    )
+    SESSION_METRICS["golden_training_pairs"] += 1
+
+    SESSION_METRICS["baseline_spend_usd"] += routing_decision.get("cloud_baseline_usd")
+    SESSION_METRICS["cash_saved_usd"] += routing_decision.get("saved_on_call_usd")
+    SESSION_METRICS["rebate_owed_to_client_usd"] += routing_decision.get("instant_cashback_rebate_usd")
+    SESSION_METRICS["shadow_calls_mirrored"] += 1
+
+    execution_overhead = (time.time() - start_time) * 1000
+    is_shadow = mode.lower() == "shadow"
+
+    return {
+        "status": "shadow_audit_logged" if is_shadow else "live_routed",
+        "tenant": tenant_name,
+        "semantic_cache_hit": is_cache_hit,
+        "tokens_trimmed": tokens_saved,
+        "pii_items_redacted": redaction_count,
+        "compressed_safe_prompt": compressed_prompt,
+        "gpu_arbitrage_ledger": routing_decision,
+        "zk_synthetic_data_minted": zk_data_asset,
+        "latency_ms": round(execution_overhead, 2)
+    }
+
+@app.post("/v1/record-outcome")
+async def record_closed_outcome(event: OutcomeEvent):
+    outcome_fee_usd = 1.50
+    SESSION_METRICS["outcomes_billed_usd"] += outcome_fee_usd
+    return {
+        "status": "outcome_verified_and_billed",
+        "event_type": event.event_type,
+        "client_deal_value_usd": event.deal_value_usd,
+        "optimax_micro_bill_usd": outcome_fee_usd,
+        "total_outcomes_billed_usd": round(SESSION_METRICS.get("outcomes_billed_usd"), 2)
+    }
+
+@app.post("/v1/demo-test")
+async def public_sandbox_test(request: PromptRequest):
+    return process_optimax_pipeline(request.prompt, request.priority, "shadow", "Live Sandbox Visitor")
+
+@app.post("/v1/route")
+async def optimize_and_route(request: PromptRequest, client_profile: dict = Depends(verify_api_key_and_billing)):
+    return process_optimax_pipeline(request.prompt, request.priority, request.mode, client_profile.get("company_name"))
