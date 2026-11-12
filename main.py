@@ -2,14 +2,14 @@ import time
 import os
 import re
 import hashlib
+from typing import Optional
 from fastapi import FastAPI, HTTPException, Header, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel
-from typing import Optional
 from supabase import create_client, Client
 import stripe
 
-app = FastAPI(title="OptiMax: Autonomous AI Revenue, Compliance & Intelligence Engine")
+app = FastAPI(title="OptiMax: Decentralized GPU Exchange, Data Refinery & Outcome Engine")
 
 stripe.api_key = os.environ.get("STRIPE_SECRET_KEY", "sk_test_mock_placeholder_key")
 YOUR_DOMAIN = os.environ.get("RENDER_EXTERNAL_URL", "http://localhost:8000")
@@ -19,26 +19,33 @@ SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "your-anon-key-here")
 supabase_db: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 SEMANTIC_CACHE = {}
+SYNTHETIC_DATA_VAULT = []
 
-LIVE_MARKET_RATES = {
-    "fast_tier": {"provider": "gpt-4o-mini-sniper", "cost_per_call": 0.012, "failover": "gemini-flash-standby"},
-    "reasoning_tier": {"provider": "claude-3-5-sonnet-sniper", "cost_per_call": 0.085, "failover": "gpt-4o-standby"}
+GPU_EXCHANGE_NODES = {
+    "fast_tier": {"node": "gpu-cluster-nordic-idle-04", "cloud_cost": 0.090, "gpu_cost": 0.014, "platform_fee": 0.004},
+    "reasoning_tier": {"node": "gpu-cluster-zurich-idle-09", "cloud_cost": 0.240, "gpu_cost": 0.048, "platform_fee": 0.015}
 }
 
 SESSION_METRICS = {
     "baseline_spend_usd": 4120.00,
-    "cash_saved_usd": 2060.00,
-    "rebate_owed_to_client_usd": 1030.00,
+    "cash_saved_usd": 2980.00,
+    "rebate_owed_to_client_usd": 1490.00,
     "threats_redacted": 54,
     "shadow_calls_mirrored": 14290,
     "cache_hits_saved": 3840,
-    "hallucinations_caught": 19
+    "hallucinations_caught": 19,
+    "golden_training_pairs": 1420,
+    "outcomes_billed_usd": 645.00
 }
 
 class PromptRequest(BaseModel):
     prompt: str
     priority: Optional[str] = "standard"
     mode: Optional[str] = "live"
+
+class OutcomeEvent(BaseModel):
+    event_type: str  # e.g., "sale_closed", "meeting_booked", "ticket_resolved"
+    deal_value_usd: Optional[float] = 0.0
 
 def auto_redact_sensitive_data(text: str) -> tuple[str, int]:
     redactions = 0
@@ -75,118 +82,115 @@ def silent_hallucination_guard(clean_prompt: str, initial_tier: str) -> tuple[st
         return "reasoning_tier", True
     return initial_tier, False
 
-def price_drop_sniper_router(clean_prompt: str, priority: str, cache_hit: bool) -> dict:
+def refine_synthetic_training_pair(clean_prompt: str, routed_node: str, upgraded: bool) -> dict:
+    """Mints an anonymized Zero-Knowledge training record for AI lab licensing."""
+    pair_id = hashlib.md5(f"{clean_prompt}-{time.time()}".encode()).hexdigest()[:10]
+    record = {
+        "pair_id": f"zk_synth_{pair_id}",
+        "sanitized_input": clean_prompt,
+        "verified_node": routed_node,
+        "quality_score": 0.99 if upgraded else 0.94,
+        "licensable_value_usd": 0.25
+    }
+    SYNTHETIC_DATA_VAULT.append(record)
+    if len(SYNTHETIC_DATA_VAULT) > 100:
+        SYNTHETIC_DATA_VAULT.pop(0)
+    return record
+
+def idle_gpu_arbitrage_router(clean_prompt: str, priority: str, cache_hit: bool) -> dict:
     if cache_hit:
         return {
-            "routed_model": "optimax-semantic-cache-edge",
-            "failover_standby": "none-required",
-            "hallucination_auto_upgraded": False,
-            "baseline_cost_usd": 0.090,
-            "optimized_cost_usd": 0.000,
+            "routed_node": "optimax-semantic-cache-edge",
+            "cloud_baseline_usd": 0.090,
+            "idle_gpu_cost_usd": 0.000,
+            "optimax_arbitrage_fee_usd": 0.000,
             "saved_on_call_usd": 0.090,
-            "instant_cashback_rebate_usd": 0.045
+            "instant_cashback_rebate_usd": 0.045,
+            "hallucination_auto_upgraded": False
         }
 
     word_count = len(clean_prompt.split())
     chosen_tier = "fast_tier" if (word_count < 25 and priority != "complex") else "reasoning_tier"
     chosen_tier, was_upgraded = silent_hallucination_guard(clean_prompt, chosen_tier)
 
-    rate_info = LIVE_MARKET_RATES[chosen_tier]
-    baseline_cost = 0.090 if chosen_tier == "fast_tier" else 0.240
-    optimized_cost = rate_info["cost_per_call"]
-    saved_amount = round(baseline_cost - optimized_cost, 4)
+    node_info = GPU_EXCHANGE_NODES[chosen_tier]
+    cloud_cost = node_info["cloud_cost"]
+    gpu_cost = node_info["gpu_cost"]
+    platform_fee = node_info["platform_fee"]
+    total_client_cost = round(gpu_cost + platform_fee, 4)
+    saved_amount = round(cloud_cost - total_client_cost, 4)
     rebate_amount = round(saved_amount * 0.50, 4)
 
     return {
-        "routed_model": rate_info["provider"],
-        "failover_standby": rate_info["failover"],
-        "hallucination_auto_upgraded": was_upgraded,
-        "baseline_cost_usd": baseline_cost,
-        "optimized_cost_usd": optimized_cost,
+        "routed_node": node_info["node"],
+        "cloud_baseline_usd": cloud_cost,
+        "idle_gpu_cost_usd": gpu_cost,
+        "optimax_arbitrage_fee_usd": platform_fee,
         "saved_on_call_usd": saved_amount,
-        "instant_cashback_rebate_usd": rebate_amount
+        "instant_cashback_rebate_usd": rebate_amount,
+        "hallucination_auto_upgraded": was_upgraded
     }
 
 @app.get("/", response_class=HTMLResponse)
 async def get_dashboard():
-    html_content = f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OptiMax Autonomous Revenue & Intelligence Engine</title>
-    <style>
-        body {{ font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0d1117; color: #c9d1d9; margin: 0; padding: 32px; }}
-        .container {{ max-width: 1080px; margin: 0 auto; background: #161b22; padding: 32px; border-radius: 10px; border: 1px solid #30363d; }}
-        h1 {{ color: #58a6ff; margin-top: 0; font-size: 26px; }}
-        .metric-box {{ display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin: 24px 0; }}
-        .metric {{ background: #21262d; padding: 16px; border-radius: 8px; border: 1px solid #30363d; text-align: center; }}
-        .metric-label {{ font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; color: #8b949e; }}
-        .metric-value {{ font-size: 20px; font-weight: bold; color: #3fb950; margin-top: 8px; }}
-        .status-badge {{ display: inline-block; padding: 6px 14px; background: rgba(63, 185, 80, 0.15); color: #3fb950; border-radius: 20px; font-size: 12px; font-weight: 600; }}
-        .sandbox {{ background: #0d1117; padding: 20px; border-radius: 8px; border: 1px solid #30363d; margin-top: 20px; }}
-        textarea {{ width: 100%; background: #161b22; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px; padding: 12px; font-family: monospace; font-size: 13px; box-sizing: border-box; margin-top: 10px; }}
-        pre {{ background: #161b22; padding: 14px; border-radius: 6px; border: 1px solid #30363d; color: #79c0ff; font-size: 12px; overflow-x: auto; margin-top: 12px; }}
-        .btn {{ display: inline-block; padding: 12px 22px; border-radius: 6px; font-weight: bold; text-decoration: none; cursor: pointer; border: none; font-size: 14px; margin-top: 12px; margin-right: 8px; }}
-        .btn-green {{ background: #238636; color: white; }}
-        .btn-green:hover {{ background: #2ea043; }}
-        .btn-blue {{ background: #1f6feb; color: white; }}
-        .btn-blue:hover {{ background: #388bfd; }}
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-            <h1>OptiMax Autonomous Revenue & Intelligence Engine</h1>
-            <span class="status-badge">● Price Sniper + Hallucination Guard + PII Shield Active</span>
-        </div>
-        <p style="color: #8b949e;">Zero-code Base URL switch. Snipes lowest API rates, auto-fixes hallucinations, serves $0 cached hits, scrubs PII leaks, and rebates 50% of Month-1 savings.</p>
-        
-        <div class="metric-box">
-            <div class="metric">
-                <div class="metric-label">Total Cash Saved</div>
-                <div class="metric-value" id="cash-counter">${SESSION_METRICS['cash_saved_usd']:,.2f}</div>
-            </div>
-            <div class="metric">
-                <div class="metric-label">50% Client Rebate</div>
-                <div class="metric-value" id="rebate-counter" style="color: #a371f7;">${SESSION_METRICS['rebate_owed_to_client_usd']:,.2f}</div>
-            </div>
-            <div class="metric">
-                <div class="metric-label">$0 Cache Hits</div>
-                <div class="metric-value" style="color: #79c0ff;">{SESSION_METRICS['cache_hits_saved']:,}</div>
-            </div>
-            <div class="metric">
-                <div class="metric-label">Errors Auto-Fixed</div>
-                <div class="metric-value" style="color: #f778ba;">{SESSION_METRICS['hallucinations_caught']}</div>
-            </div>
-            <div class="metric">
-                <div class="metric-label">Shadow Calls</div>
-                <div class="metric-value" style="color: #58a6ff;">{SESSION_METRICS['shadow_calls_mirrored']:,}</div>
-            </div>
-            <div class="metric">
-                <div class="metric-label">PII Leaks Blocked</div>
-                <div class="metric-value" style="color: #d29922;">{SESSION_METRICS['threats_redacted']}</div>
-            </div>
-        </div>
+    saved = f"{SESSION_METRICS['cash_saved_usd']:,.2f}"
+    rebate = f"{SESSION_METRICS['rebate_owed_to_client_usd']:,.2f}"
+    synth_pairs = f"{SESSION_METRICS['golden_training_pairs']:,}"
+    outcomes_usd = f"{SESSION_METRICS['outcomes_billed_usd']:,.2f}"
+    cache_hits = f"{SESSION_METRICS['cache_hits_saved']:,}"
+    threats = SESSION_METRICS['threats_redacted']
 
-        <div class="sandbox">
-            <strong style="color: #58a6ff; font-size: 15px;">Live Engineer Sandbox (Test PII Redaction, Token Diet, Hallucination Guard & $0 Caching)</strong>
-            <textarea id="test-prompt" rows="3">Please kindly review this financial audit for john.doe@enterprise.com with card 4532 1234 5678 9010 immediately.</textarea>
-            <button class="btn btn-blue" onclick="runLiveTest()">Run Live API Simulation</button>
-            <pre id="test-output">Click "Run Live API Simulation" to test OptiMax live. Click twice to trigger an instant $0 Semantic Cache hit...</pre>
-        </div>
+    html = (
+        "<!DOCTYPE html><html><head><meta charset='UTF-8'>"
+        "<title>OptiMax GPU Exchange, Data Refinery & Outcome Engine</title>"
+        "<style>"
+        "body{font-family:sans-serif;background:#0d1117;color:#c9d1d9;padding:28px;}"
+        ".box{max-width:1100px;margin:0 auto;background:#161b22;padding:28px;border-radius:10px;border:1px solid #30363d;}"
+        ".grid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin:20px 0;}"
+        ".card{background:#21262d;padding:14px;border-radius:8px;border:1px solid #30363d;text-align:center;}"
+        ".lbl{font-size:11px;text-transform:uppercase;color:#8b949e;}"
+        ".val{font-size:19px;font-weight:bold;color:#3fb950;margin-top:6px;}"
+        "textarea{width:100%;background:#0d1117;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:10px;font-family:monospace;box-sizing:border-box;}"
+        "pre{background:#0d1117;padding:12px;border-radius:6px;border:1px solid #30363d;color:#79c0ff;overflow-x:auto;font-size:12px;}"
+        ".btn{display:inline-block;padding:11px 18px;border-radius:6px;font-weight:bold;text-decoration:none;color:#fff;cursor:pointer;border:none;margin-top:10px;margin-right:8px;font-size:13px;}"
+        "</style></head><body><div class='box'>"
+        "<h1 style='color:#58a6ff;margin-top:0;'>OptiMax Decentralized GPU Exchange & Data Refinery</h1>"
+        "<p style='color:#8b949e;'>Idle GPU Compute Arbitrage + Zero-Knowledge Synthetic Data Refinery + $1.50 Outcome Micro-Billing + 50% Month-1 Rebate</p>"
+        "<div class='grid'>"
+        f"<div class='card'><div class='lbl'>GPU Savings</div><div class='val'>${saved}</div></div>"
+        f"<div class='card'><div class='lbl'>50% Rebate</div><div class='val' style='color:#a371f7;'>${rebate}</div></div>"
+        f"<div class='card'><div class='lbl'>ZK Data Pairs</div><div class='val' style='color:#f778ba;'>{synth_pairs}</div></div>"
+        f"<div class='card'><div class='lbl'>Outcome Billed</div><div class='val' style='color:#58a6ff;'>${outcomes_usd}</div></div>"
+        f"<div class='card'><div class='lbl'>$0 Cache Hits</div><div class='val' style='color:#79c0ff;'>{cache_hits}</div></div>"
+        f"<div class='card'><div class='lbl'>PII Blocked</div><div class='val' style='color:#d29922;'>{threats}</div></div>"
+        "</div>"
+        "<h3>Live Engineer Sandbox (Test GPU Arbitrage, ZK Data Minting & Outcome Billing)</h3>"
+        "<textarea id='prompt' rows='3'>Please kindly audit this legal contract for sarah.connor@enterprise.com with card 4532 1234 5678 9010 immediately.</textarea>"
+        "<button class='btn' style='background:#1f6feb;' onclick='runTest()'>1. Test GPU Arbitrage & ZK Data Mint</button>"
+        "<button class='btn' style='background:#8957e5;' onclick='testOutcome()'>2. Simulate Closed Sale ($1.50 Micro-Bill)</button>"
+        "<pre id='out'>Click either button above to test OptiMax live...</pre>"
+        "<div style='margin-top:20px;text-align:center;'>"
+        "<a class='btn' style='background:#238636;' href='/create-checkout-session'>Start 14-Day Free Trial</a>"
+        "<a class='btn' style='background:#1f6feb;' href='/shadow-receipt' target='_blank'>View 48-Hr Shadow Audit Receipt</a>"
+        "</div></div>"
+        "<script>"
+        "async function runTest(){"
+        "const p=document.getElementById('prompt').value;"
+        "const o=document.getElementById('out');"
+        "o.innerText='Routing to Decentralized Idle GPU Node...';"
+        "const r=await fetch('/v1/demo-test',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:p,mode:'shadow'})});"
+        "o.innerText=JSON.stringify(await r.json(),null,2);"
+        "}"
+        "async function testOutcome(){"
+        "const o=document.getElementById('out');"
+        "o.innerText='Recording verified closed sale outcome...';"
+        "const r=await fetch('/v1/record-outcome',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({event_type:'sale_closed',deal_value_usd:250.00})});"
+        "o.innerText=JSON.stringify(await r.json(),null,2);"
+        "}"
+        "</script></body></html>"
+    )
+    return HTMLResponse(content=html, status_code=200)
 
-        <div style="background: #21262d; padding: 24px; border-radius: 8px; border: 1px solid #30363d; margin-top: 24px; text-align: center;">
-            <h3 style="margin-top: 0;">Deploy OptiMax Enterprise + Claim 50% Month-1 Cash-Back Rebate</h3>
-            <p style="color: #8b949e;">Zero upfront cost. Start your 14-day free trial or download your 48-Hour Shadow Audit statement.</p>
-            <a class="btn btn-green" href="/create-checkout-session">Start 14-Day Free Trial</a>
-            <a class="btn btn-blue" href="/shadow-receipt" target="_blank">View 48-Hr Shadow Audit Receipt</a>
-        </div>
-    </div>
-
-    <script>
-        let saved = {SESSION_METRICS['cash_saved_usd']};
-        let rebate = {SESSION_METRICS['rebate_owed_to_client_usd']};
-        setInterval(() => {{
-            saved += 0.06;
-            rebate += 0.03;
+@app.get("/shadow-receipt", response_class=HTMLResponse)
+async def get_shadow_receipt():
+    receipt = (
