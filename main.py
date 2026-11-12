@@ -6,17 +6,22 @@ from typing import Optional
 from fastapi import FastAPI, HTTPException, Header, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel
-from supabase import create_client, Client
 import stripe
 
 app = FastAPI(title="OptiMax: Decentralized GPU Exchange, Data Refinery & Outcome Engine")
 
 stripe.api_key = os.environ.get("STRIPE_SECRET_KEY", "sk_test_mock_placeholder_key")
 YOUR_DOMAIN = os.environ.get("RENDER_EXTERNAL_URL", "http://localhost:8000")
-SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://supabase.co")
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "your-anon-key-here")
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "").strip()
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "").strip()
 
-supabase_db: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+supabase_db = None
+if SUPABASE_URL and SUPABASE_KEY:
+    try:
+        from supabase import create_client
+        supabase_db = create_client(SUPABASE_URL, SUPABASE_KEY)
+    except Exception as db_err:
+        print(f"Supabase init warning: {db_err}")
 
 SEMANTIC_CACHE = dict()
 SYNTHETIC_DATA_VAULT = list()
@@ -211,5 +216,3 @@ async def get_shadow_receipt():
         "status": "VERIFIED",
         "shadow_calls_audited": SESSION_METRICS.get("shadow_calls_mirrored"),
         "zero_cost_cache_hits": SESSION_METRICS.get("cache_hits_saved"),
-        "zk_synthetic_pairs_minted": SESSION_METRICS.get("golden_training_pairs"),
-        "outcomes_billed_usd": round(SESSION_METRICS.get("outcomes_billed_usd"), 2),
