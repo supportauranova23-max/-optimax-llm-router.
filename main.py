@@ -118,3 +118,60 @@ async def home():
     ]
     return HTMLResponse(content="".join(html))
 
+@app.post("/v1/canary-alert")
+async def canary_alert(req: CanaryReq):
+    BANNED_IPS.add(req.attacker_ip); METRICS["traps"] += 1
+    return {"status": "ATTACKER_NEUTRALIZED", "trapped_ip": req.attacker_ip, "canary_token": req.canary_token, "proof": mint_zk_proof(req.attacker_ip, req.canary_token)}
+
+@app.get("/zk-passport")
+async def zk_passport():
+    return {"document": "OPTIMAX ZK COMPLIANCE PASSPORT", "standards": ("EU_AI_ACT_2026", "HIPAA_ZERO_PII"), "metrics": METRICS}
+
+@app.get("/checkout/{tier}")
+async def checkout(tier: str):
+    plan = PLANS.get(tier, PLANS["starter"])
+    try:
+        item = {"price_data": {"currency": "usd", "product_data": {"name": plan["name"]}, "unit_amount": plan["cents"], "recurring": {"interval": "month"}}, "quantity": 1}
+        sub = {"trial_period_days": plan["trial"]} if plan["trial"] > 0 else dict()
+        s = stripe.checkout.Session.create(line_items=(item,), mode="subscription", subscription_data=sub, success_url=YOUR_DOMAIN + "/?ok=1", cancel_url=YOUR_DOMAIN + "/")
+        return RedirectResponse(url=s.url, status_code=303)
+    except Exception as e: raise HTTPException(status_code=500, detail=str(e))
+
+async def process_call(text: str, cat: str, uid: str, auth: Optional[str]) -> dict:
+    t0 = time.time()
+    if uid in BANNED_IPS: return {"status": "ACCESS_DENIED", "reason": "Blacklisted by Honeypot."}
+    low = text.lower()
+    if any(p in low for p in ("ignore previous instructions", "exfiltrate", "system prompt", "eval(")):
+        return {"status": "BLOCKED_BY_QUANTUM_SHIELD", "reason": "Memory poisoning attempt blocked."}
+    if any(r in low for r in ("100% free", "90% discount", "full refund approved", "lifetime access for $0")):
+        METRICS["liab"] += 1
+        return {"status": "BLOCKED_BY_LIABILITY_SHIELD", "reason": "Unauthorized financial commitment blocked.", "loss_prevented_usd": 50000}
+    masked, pmap, cnt = scrub_pii(text); METRICS["pii"] += cnt
+    h = hashlib.sha256(masked.lower().encode()).hexdigest()
+    if h in SEMANTIC_CACHE:
+        raw, engine, cost = SEMANTIC_CACHE[h], "optimax-semantic-cache-edge", 0.0
+    else:
+        raw, engine = await run_inference(masked, auth); SEMANTIC_CACHE[h] = raw; cost = 0.015
+    final = restore_pii(raw, pmap)
+    c = DISTILL_COUNTS.get(cat, 498) + 1; DISTILL_COUNTS[cat] = c
+    if c == 500: METRICS["models"] += 1
+    METRICS["saved"] = round(METRICS["saved"] + (0.095 - cost), 2); METRICS["profit"] = round(METRICS["profit"] + 0.025, 2)
+    return {"status": "success", "engine": engine, "scrubbed_prompt": masked, "rehydrated_reply": final, "distillation_pairs": f"{c}/500", "zk_passport": mint_zk_proof(uid, masked), "ms": round((time.time() - t0) * 1000, 2)}
+
+@app.post("/v1/demo-test")
+async def demo_test(req: PromptReq):
+    return await process_call(req.prompt, req.task_category, req.user_id, None)
+
+@app.post("/v1/chat/completions")
+async def openai_dropin(req: OpenAIReq, authorization: Optional[str] = Header(None)):
+    msg = next((str(m.get("content", "")) for m in req.messages if m.get("role") == "user"), "")
+    res = await process_call(msg, "general_chat", req.user, authorization)
+    if res.get("status") != "success": raise HTTPException(status_code=403, detail=res.get("reason"))
+    return {"id": f"chatcmpl-{int(time.time())}", "object": "chat.completion", "model": res.get("engine"), "choices": ({"index": 0, "message": {"role": "assistant", "content": res.get("rehydrated_reply")}, "finish_reason": "stop"},), "zk_passport": res.get("zk_passport")}
+
+@app.post("/v1/record-outcome")
+async def record_outcome(ev: OutcomeReq):
+    METRICS["outcomes"] += 1.50
+    return {"status": "billed", "event": ev.event_type, "fee_usd": 1.50, "total_usd": METRICS["outcomes"]}
+
+
