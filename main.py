@@ -86,39 +86,50 @@ async def route_multi_model(safe_prompt: str, model: str, auth: Optional[str]) -
             except Exception: pass
     return f"[OptiMax Multi-Model Edge ({model})] Verified Safe: {safe_prompt}", f"optimax-{model}-failover-node"
 
-@app.get("/", response_class=HTMLResponse)
-async def home():
-    m = METRICS
-    c_card = "background:#0f172a;border:1px solid #1e293b;border-radius:12px;padding:16px;text-align:center;"
-    c_btn = "display:inline-block;padding:10px 16px;border-radius:8px;font-weight:bold;text-decoration:none;color:#fff;cursor:pointer;border:none;margin:10px 8px 0 0;"
-    c_inp = "width:100%;background:#03050a;color:#7dd3fc;border:1px solid #1e293b;border-radius:8px;padding:10px;font-family:monospace;margin-top:8px;box-sizing:border-box;"
-    h = f"<!DOCTYPE html><html><body style='font-family:sans-serif;background:#050811;color:#f1f5f9;margin:0;padding:30px;'>"
-    h += "<div style='max-width:1100px;margin:0 auto;'>"
-    h += "<div style='display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #1e293b;padding-bottom:16px;'>"
-    h += "<b style='font-size:20px;'>OPTIMAX<span style='color:#38bdf8;'>.AI</span></b><a href='/health' target='_blank' style='color:#34d399;text-decoration:none;font-size:12px;'>● LIVE SLA & UPTIME</a></div>"
-    h += "<h1 style='color:#38bdf8;margin:24px 0 8px;'>Multi-Model AI Security & Cost-Zero Gateway</h1>"
-    h += "<p style='color:#94a3b8;margin-top:0;'>Route OpenAI, Claude & Gemini through 1 API • Self-Serve Customer Keys • Zero-Leak PII & Liability Shield</p>"
-    h += "<div style='display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin:20px 0;'>"
-    h += f"<div style='{c_card}'><small style='color:#64748b;'>SAVED</small><h3 style='color:#34d399;margin:6px 0 0;'>${m['saved']:,.2f}</h3></div>"
-    h += f"<div style='{c_card}'><small style='color:#64748b;'>PROFIT</small><h3 style='color:#38bdf8;margin:6px 0 0;'>${m['profit']:,.2f}</h3></div>"
-    h += f"<div style='{c_card}'><small style='color:#64748b;'>PII SAFE</small><h3 style='color:#fbbf24;margin:6px 0 0;'>{m['pii']}</h3></div>"
-    h += f"<div style='{c_card}'><small style='color:#64748b;'>LIABILITY</small><h3 style='color:#f87171;margin:6px 0 0;'>{m['liab']}</h3></div>"
-    h += f"<div style='{c_card}'><small style='color:#64748b;'>MODELS</small><h3 style='color:#a78bfa;margin:6px 0 0;'>{m['models']}</h3></div></div>"
-    h += "<div style='background:#0b1120;border:1px solid #1e293b;border-radius:14px;padding:20px;margin-bottom:20px;'>"
-    h += "<h3 style='margin-top:0;'>Self-Serve Customer Portal</h3>"
-    h += f"<input id='email' placeholder='founder@yourcompany.com' style='{c_inp}'><input id='cust_key' value='optx_live_demo_founder' style='{c_inp}'>"
-    h += f"<button onclick='genKey()' style='{c_btn}background:#059669;'>Generate Personal API Key</button>"
-    h += f"<button onclick='getStats()' style='{c_btn}background:#2563eb;'>View My Usage & Savings</button>"
-    h += "<pre id='key_out' style='background:#03050a;padding:12px;border-radius:8px;color:#34d399;overflow-x:auto;'>Enter email above to mint an instant API key...</pre></div>"
-    h += "<div style='background:#0b1120;border:1px solid #1e293b;border-radius:14px;padding:20px;margin-bottom:20px;'>"
-    h += "<h3 style='margin-top:0;'>Live Multi-Model Sandbox</h3>"
-    h += f"<select id='mdl' style='{c_inp}'><option value='gpt-4o-mini'>OpenAI GPT-4o-Mini</option><option value='claude-3-5-sonnet'>Anthropic Claude 3.5 Sonnet</option><option value='gemini-2.5-flash'>Google Gemini 2.5 Flash</option></select>"
-    h += f"<textarea id='p' rows='2' style='{c_inp}'>Confirm renewal for sarah@enterprise.com on card 4532 1234 5678 9010.</textarea>"
-    h += f"<button onclick='t1()' style='{c_btn}background:#2563eb;'>1. Route Multi-Model & Scrub PII</button>"
-    h += f"<button onclick='t2()' style='{c_btn}background:#dc2626;'>2. Test Financial Liability Shield</button>"
-    h += "<pre id='out' style='background:#03050a;padding:12px;border-radius:8px;color:#34d399;overflow-x:auto;'>Select a model and click Route Multi-Model...</pre></div>"
-    h += "<div style='display:grid;grid-template-columns:repeat(3,1fr);gap:14px;'>"
-    h += f"<div style='{c_card}'><h4>Starter</h4><h2 style='color:#34d399;'>$49/mo</h2><p style='color:#94a3b8;font-size:13px;'>14-Day Trial + 50% Rebate</p><a href='/checkout/starter' style='{c_btn}background:#059669;'>Start 14-Day Trial</a></div>"
-    h += f"<div style='{c_card}'><h4>Growth</h4><h2 style='color:#38bdf8;'>$499/mo</h2><p style='color:#94a3b8;font-size:13px;'>+ 15% Net Savings Share</p><a href='/checkout/growth' style='{c_btn}background:#2563eb;'>Start Growth Trial</a></div>"
-    h += f"<div style='{c_card}'><h4>Enterprise</h4><h2 style='color:#a78bfa;'>$15,000/mo</h2><p style='color:#94a3b8;font-size:13px;'>Dedicated Nodes + ZK Passports</p><a href='/checkout/enterprise' style='{c_btn}background:#7c3aed;'>Activate Enterprise</a></div></div></div>"
-    h += "<script>async function genKey(){const r=await fetch('/v1/keys/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:document.getElementById('email').value})});const d=await r.json();if(d.api_key)document.getElementById('cust_key').value=d.api_key;document.getElementById('key_out').innerText=JSON.stringify(d,null,2);}"
+DASHBOARD_HTML = r"""<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>OptiMax | Multi-Model AI Gateway</title>
+</head>
+<body style="font-family:sans-serif;background:#050811;color:#f1f5f9;margin:0;padding:30px;">
+<div style="max-width:1100px;margin:0 auto;">
+  <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #1e293b;padding-bottom:16px;">
+    <b style="font-size:22px;">OPTIMAX<span style="color:#38bdf8;">.AI</span></b>
+    <a href="/health" target="_blank" style="color:#34d399;text-decoration:none;font-size:12px;">● LIVE SLA & UPTIME</a>
+  </div>
+  <h1 style="color:#38bdf8;margin:24px 0 8px;">Multi-Model AI Security & Cost-Zero Gateway</h1>
+  <p style="color:#94a3b8;margin-top:0;">Route OpenAI, Claude & Gemini through 1 API • Self-Serve Customer Keys • Zero-Leak PII & Liability Shield</p>
+
+  <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin:20px 0;">
+    <div style="background:#0f172a;border:1px solid #1e293b;border-radius:12px;padding:16px;text-align:center;"><small style="color:#64748b;">SAVED</small><h3 style="color:#34d399;margin:6px 0 0;">$2,980.00</h3></div>
+    <div style="background:#0f172a;border:1px solid #1e293b;border-radius:12px;padding:16px;text-align:center;"><small style="color:#64748b;">PROFIT</small><h3 style="color:#38bdf8;margin:6px 0 0;">$840.50</h3></div>
+    <div style="background:#0f172a;border:1px solid #1e293b;border-radius:12px;padding:16px;text-align:center;"><small style="color:#64748b;">PII SAFE</small><h3 style="color:#fbbf24;margin:6px 0 0;">54</h3></div>
+    <div style="background:#0f172a;border:1px solid #1e293b;border-radius:12px;padding:16px;text-align:center;"><small style="color:#64748b;">LIABILITY</small><h3 style="color:#f87171;margin:6px 0 0;">18</h3></div>
+    <div style="background:#0f172a;border:1px solid #1e293b;border-radius:12px;padding:16px;text-align:center;"><small style="color:#64748b;">MODELS</small><h3 style="color:#a78bfa;margin:6px 0 0;">3</h3></div>
+  </div>
+
+  <div style="background:#0b1120;border:1px solid #1e293b;border-radius:14px;padding:20px;margin-bottom:20px;">
+    <h3 style="margin-top:0;">Self-Serve Customer Portal</h3>
+    <input id="email" placeholder="founder@yourcompany.com" style="width:100%;background:#03050a;color:#7dd3fc;border:1px solid #1e293b;border-radius:8px;padding:10px;font-family:monospace;margin-top:8px;box-sizing:border-box;">
+    <input id="cust_key" value="optx_live_demo_founder" style="width:100%;background:#03050a;color:#7dd3fc;border:1px solid #1e293b;border-radius:8px;padding:10px;font-family:monospace;margin-top:8px;box-sizing:border-box;">
+    <button onclick="genKey()" style="display:inline-block;padding:10px 16px;border-radius:8px;font-weight:bold;color:#fff;cursor:pointer;border:none;margin:10px 8px 0 0;background:#059669;">Generate Personal API Key</button>
+    <button onclick="getStats()" style="display:inline-block;padding:10px 16px;border-radius:8px;font-weight:bold;color:#fff;cursor:pointer;border:none;margin:10px 8px 0 0;background:#2563eb;">View My Usage & Savings</button>
+    <pre id="key_out" style="background:#03050a;padding:12px;border-radius:8px;color:#34d399;overflow-x:auto;">Enter email above to mint an instant API key...</pre>
+  </div>
+
+  <div style="background:#0b1120;border:1px solid #1e293b;border-radius:14px;padding:20px;margin-bottom:20px;">
+    <h3 style="margin-top:0;">Live Multi-Model Sandbox</h3>
+    <select id="mdl" style="width:100%;background:#03050a;color:#7dd3fc;border:1px solid #1e293b;border-radius:8px;padding:10px;font-family:monospace;margin-top:8px;box-sizing:border-box;">
+      <option value="gpt-4o-mini">OpenAI GPT-4o-Mini</option>
+      <option value="claude-3-5-sonnet">Anthropic Claude 3.5 Sonnet</option>
+      <option value="gemini-2.5-flash">Google Gemini 2.5 Flash</option>
+    </select>
+    <textarea id="p" rows="2" style="width:100%;background:#03050a;color:#7dd3fc;border:1px solid #1e293b;border-radius:8px;padding:10px;font-family:monospace;margin-top:8px;box-sizing:border-box;">Confirm renewal for sarah@enterprise.com on card 4532 1234 5678 9010.</textarea>
+    <button onclick="t1()" style="display:inline-block;padding:10px 16px;border-radius:8px;font-weight:bold;color:#fff;cursor:pointer;border:none;margin:10px 8px 0 0;background:#2563eb;">1. Route Multi-Model & Scrub PII</button>
+    <button onclick="t2()" style="display:inline-block;padding:10px 16px;border-radius:8px;font-weight:bold;color:#fff;cursor:pointer;border:none;margin:10px 8px 0 0;background:#dc2626;">2. Test Financial Liability Shield</button>
+    <pre id="out" style="background:#03050a;padding:12px;border-radius:8px;color:#34d399;overflow-x:auto;">Select a model and click Route Multi-Model...</pre>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;">
+    <div style="background:#0f172a;border:1px solid #1e293b;border-radius:12px;padding:16px;text-align:center;"><h4>Starter</h4><h2 style="color:#34d399;">$49/mo</h2><p style="color:#94a3b8;font-size:13px;">14-Day Trial + 50% Rebate</p><a href="/checkout/starter" style="display:inline-block;padding:10px 16px;border-radius:8px;font-weight:bold;text-decoration:none;color:#fff;background:#059669;">Start 14-Day Trial</a></div>
