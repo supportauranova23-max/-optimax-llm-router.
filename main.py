@@ -16,8 +16,7 @@ GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
 SIGNING_SECRET = os.environ.get("OPTIMAX_SIGNING_SECRET", "optimax_quantum_vault_2026").encode()
 
 CUSTOMER_KEYS = {"optx_live_demo_founder": {"email": "demo@startup.ai", "calls": 14, "saved_usd": 1.15, "pii_blocked": 3}}
-SEMANTIC_CACHE, DISTILL_COUNTS, BANNED_IPS = dict(), dict(), set()
-METRICS = {"saved": 2980.00, "profit": 840.50, "pii": 54, "liab": 18, "traps": 4, "models": 3, "outcomes": 645.00}
+METRICS = {"saved": 2980.00, "profit": 840.50, "pii": 54, "liab": 18, "models": 3}
 
 PLANS = {
     "starter": {"name": "OptiMax Starter (100k Calls + 50% Rebate)", "cents": 4900, "trial": 14},
@@ -90,39 +89,38 @@ async def route_multi_model(safe_prompt: str, model: str, auth: Optional[str]) -
 @app.get("/", response_class=HTMLResponse)
 async def home():
     m = METRICS
-    html = [
-        "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>OptiMax | Multi-Model AI Gateway</title>",
-        "<style>*{box-sizing:border-box;}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#050811;color:#f1f5f9;margin:0;padding:36px 20px;}",
-        ".wrap{max-width:1140px;margin:0 auto;}.nav{display:flex;justify-content:space-between;align-items:center;padding-bottom:20px;border-bottom:1px solid #1e293b;}",
-        ".logo{font-weight:800;font-size:20px;color:#fff;}.logo span{color:#38bdf8;}",
-        ".pill{background:rgba(16,185,129,.12);color:#34d399;border:1px solid rgba(16,185,129,.3);padding:5px 12px;border-radius:99px;font-size:12px;font-weight:600;text-decoration:none;}",
-        ".hero{text-align:center;padding:32px 0 20px;}.hero h1{font-size:36px;margin:0 0 10px;background:linear-gradient(135deg,#fff 30%,#38bdf8 70%,#818cf8);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}",
-        ".grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:14px;margin:22px 0;}",
-        ".card{background:linear-gradient(180deg,#0f172a,#0b1120);border:1px solid #1e293b;border-radius:14px;padding:18px;text-align:center;}",
-        ".panel{background:#0b1120;border:1px solid #1e293b;border-radius:16px;padding:22px;margin-bottom:20px;}",
-        "input,select,textarea,code{width:100%;background:#03050a;color:#7dd3fc;border:1px solid #1e293b;border-radius:9px;padding:11px;font-family:monospace;font-size:13px;margin-top:8px;display:block;}",
-        "pre{background:#03050a;padding:14px;border-radius:9px;border:1px solid #1e293b;color:#34d399;overflow-x:auto;font-size:12px;margin-top:12px;}",
-        ".btn{display:inline-block;padding:10px 16px;border-radius:8px;font-weight:600;text-decoration:none;color:#fff;cursor:pointer;border:none;margin:10px 8px 0 0;font-size:13px;}",
-        ".tiers{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-top:20px;}</style></head>",
-        "<body><div class='wrap'><div class='nav'><div class='logo'>OPTIMAX<span>.AI</span></div><a class='pill' href='/health' target='_blank'>● LIVE SLA & UPTIME TELEMETRY</a></div>",
-        "<div class='hero'><h1>Multi-Model AI Security & Cost-Zero Gateway</h1>",
-        "<p style='color:#94a3b8;margin:0;'>Route OpenAI, Claude & Gemini through 1 API • Self-Serve Customer Keys • Zero-Leak PII & Liability Shield</p></div>",
-        "<div class='grid'>",
-        f"<div class='card'><small style='color:#64748b;'>CLIENT SAVED</small><h3 style='color:#34d399;margin:6px 0 0;'>${m['saved']:,.2f}</h3></div>",
-        f"<div class='card'><small style='color:#64748b;'>SPOT PROFIT</small><h3 style='color:#38bdf8;margin:6px 0 0;'>${m['profit']:,.2f}</h3></div>",
-        f"<div class='card'><small style='color:#64748b;'>PII SCRUBBED</small><h3 style='color:#fbbf24;margin:6px 0 0;'>{m['pii']}</h3></div>",
-        f"<div class='card'><small style='color:#64748b;'>LIABILITY SAVED</small><h3 style='color:#f87171;margin:6px 0 0;'>{m['liab']}</h3></div>",
-        f"<div class='card'><small style='color:#64748b;'>DISTILLED MODELS</small><h3 style='color:#a78bfa;margin:6px 0 0;'>{m['models']}</h3></div></div>",
-        "<div class='panel'><h3 style='margin-top:0;'>Self-Serve Customer Portal (Generate Your Live API Key)</h3>",
-        "<div style='display:grid;grid-template-columns:2fr 1fr;gap:10px;'><input id='email' placeholder='founder@yourcompany.com'><input id='cust_key' value='optx_live_demo_founder'></div>",
-        "<button class='btn' style='background:#059669;' onclick='genKey()'>Generate Personal API Key</button>",
-        "<button class='btn' style='background:#2563eb;' onclick='getStats()'>View My Personal Usage & Savings</button>",
-        "<pre id='key_out'>Enter your work email above to mint an instant OptiMax API key...</pre></div>",
-        "<div class='panel'><h3 style='margin-top:0;'>Live Multi-Model Sandbox (OpenAI • Anthropic Claude • Google Gemini)</h3>",
-        "<select id='mdl'><option value='gpt-4o-mini'>OpenAI GPT-4o-Mini</option><option value='claude-3-5-sonnet'>Anthropic Claude 3.5 Sonnet</option><option value='gemini-2.5-flash'>Google Gemini 2.5 Flash</option></select>",
-        "<textarea id='p' rows='2'>Confirm subscription renewal for sarah@enterprise.com on card 4532 1234 5678 9010.</textarea>",
-        "<button class='btn' style='background:#2563eb;' onclick='t1()'>1. Route Multi-Model & Scrub PII</button>",
-        "<button class='btn' style='background:#dc2626;' onclick='t2()'>2. Test Financial Liability Shield</button>",
-        "<pre id='out'>Select a model above and click Route Multi-Model...</pre></div>",
-        "<div class='tiers'>",
-        "<div class='card'><h4>Starter Hook</h4><h2 style='color:#34d399;'>$49/mo</h2><p style='color:#94a3b8;font-size:13px;'>14-Day Free Trial + 50% Month-1 Rebate</p><a class='btn' style='background:#059669;' href='/checkout/starter'>Start 14-Day Free Trial</a></div>",
+    h = "<!DOCTYPE html><html><head><meta charset='UTF-8'><title>OptiMax | Multi-Model AI Gateway</title>"
+    h += "<style>*{box-sizing:border-box;}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#050811;color:#f1f5f9;margin:0;padding:36px 20px;}"
+    h += ".wrap{max-width:1140px;margin:0 auto;}.nav{display:flex;justify-content:space-between;align-items:center;padding-bottom:20px;border-bottom:1px solid #1e293b;}"
+    h += ".logo{font-weight:800;font-size:20px;color:#fff;}.logo span{color:#38bdf8;}"
+    h += ".pill{background:rgba(16,185,129,.12);color:#34d399;border:1px solid rgba(16,185,129,.3);padding:5px 12px;border-radius:99px;font-size:12px;font-weight:600;text-decoration:none;}"
+    h += ".hero{text-align:center;padding:32px 0 20px;}.hero h1{font-size:36px;margin:0 0 10px;background:linear-gradient(135deg,#fff 30%,#38bdf8 70%,#818cf8);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}"
+    h += ".grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:14px;margin:22px 0;}"
+    h += ".card{background:linear-gradient(180deg,#0f172a,#0b1120);border:1px solid #1e293b;border-radius:14px;padding:18px;text-align:center;}"
+    h += ".panel{background:#0b1120;border:1px solid #1e293b;border-radius:16px;padding:22px;margin-bottom:20px;}"
+    h += "input,select,textarea{width:100%;background:#03050a;color:#7dd3fc;border:1px solid #1e293b;border-radius:9px;padding:11px;font-family:monospace;font-size:13px;margin-top:8px;display:block;}"
+    h += "pre{background:#03050a;padding:14px;border-radius:9px;border:1px solid #1e293b;color:#34d399;overflow-x:auto;font-size:12px;margin-top:12px;}"
+    h += ".btn{display:inline-block;padding:10px 16px;border-radius:8px;font-weight:600;text-decoration:none;color:#fff;cursor:pointer;border:none;margin:10px 8px 0 0;font-size:13px;}"
+    h += ".tiers{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-top:20px;}</style></head>"
+    h += "<body><div class='wrap'><div class='nav'><div class='logo'>OPTIMAX<span>.AI</span></div><a class='pill' href='/health' target='_blank'>● LIVE SLA & UPTIME TELEMETRY</a></div>"
+    h += "<div class='hero'><h1>Multi-Model AI Security & Cost-Zero Gateway</h1>"
+    h += "<p style='color:#94a3b8;margin:0;'>Route OpenAI, Claude & Gemini through 1 API • Self-Serve Customer Keys • Zero-Leak PII & Liability Shield</p></div>"
+    h += "<div class='grid'>"
+    h += f"<div class='card'><small style='color:#64748b;'>CLIENT SAVED</small><h3 style='color:#34d399;margin:6px 0 0;'>${m['saved']:,.2f}</h3></div>"
+    h += f"<div class='card'><small style='color:#64748b;'>SPOT PROFIT</small><h3 style='color:#38bdf8;margin:6px 0 0;'>${m['profit']:,.2f}</h3></div>"
+    h += f"<div class='card'><small style='color:#64748b;'>PII SCRUBBED</small><h3 style='color:#fbbf24;margin:6px 0 0;'>{m['pii']}</h3></div>"
+    h += f"<div class='card'><small style='color:#64748b;'>LIABILITY SAVED</small><h3 style='color:#f87171;margin:6px 0 0;'>{m['liab']}</h3></div>"
+    h += f"<div class='card'><small style='color:#64748b;'>DISTILLED MODELS</small><h3 style='color:#a78bfa;margin:6px 0 0;'>{m['models']}</h3></div></div>"
+    h += "<div class='panel'><h3 style='margin-top:0;'>Self-Serve Customer Portal (Generate Your Live API Key)</h3>"
+    h += "<div style='display:grid;grid-template-columns:2fr 1fr;gap:10px;'><input id='email' placeholder='founder@yourcompany.com'><input id='cust_key' value='optx_live_demo_founder'></div>"
+    h += "<button class='btn' style='background:#059669;' onclick='genKey()'>Generate Personal API Key</button>"
+    h += "<button class='btn' style='background:#2563eb;' onclick='getStats()'>View My Personal Usage & Savings</button>"
+    h += "<pre id='key_out'>Enter your work email above to mint an instant OptiMax API key...</pre></div>"
+    h += "<div class='panel'><h3 style='margin-top:0;'>Live Multi-Model Sandbox (OpenAI • Anthropic Claude • Google Gemini)</h3>"
+    h += "<select id='mdl'><option value='gpt-4o-mini'>OpenAI GPT-4o-Mini</option><option value='claude-3-5-sonnet'>Anthropic Claude 3.5 Sonnet</option><option value='gemini-2.5-flash'>Google Gemini 2.5 Flash</option></select>"
+    h += "<textarea id='p' rows='2'>Confirm subscription renewal for sarah@enterprise.com on card 4532 1234 5678 9010.</textarea>"
+    h += "<button class='btn' style='background:#2563eb;' onclick='t1()'>1. Route Multi-Model & Scrub PII</button>"
+    h += "<button class='btn' style='background:#dc2626;' onclick='t2()'>2. Test Financial Liability Shield</button>"
+    h += "<pre id='out'>Select a model above and click Route Multi-Model...</pre></div>"
+    h += "<div class='tiers'>"
+    h += "<div class='card'><h4>Starter Hook</h4><h2 style='color:#34d399;'>$49/mo</h2><p style='color:#94a3b8;font-size:13px;'>14-Day Free Trial + 50% Month-1 Rebate</p><a class='btn' style='background:#059669;' href='/checkout/starter'>Start 14-Day Free Trial</a></div>"
