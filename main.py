@@ -1,7 +1,7 @@
 import time, os, re, hmac, hashlib, secrets, json, sqlite3
 from typing import Optional, List, Dict, Any
-from fastapi import FastAPI, HTTPException, Header, Query, Request
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi import FastAPI, HTTPException, Header, Query
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 import httpx
 
@@ -13,20 +13,16 @@ ANTHROPIC_KEY = os.environ.get("ANTHROPIC_API_KEY", "").strip()
 GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
 SECRET = os.environ.get("OPTIMAX_SIGNING_SECRET", "optimax_vault_2026").encode()
 
-# 1. Persistent SQLite Storage (Survives Restarts)
 DB = sqlite3.connect("optimax.db", check_same_thread=False)
-DB.execute("CREATE TABLE IF NOT EXISTS api_keys (key TEXT PRIMARY KEY, email TEXT, cap REAL, spent REAL, calls INTEGER)")
-DB.execute("INSERT OR IGNORE INTO api_keys VALUES ('optx_live_demo', 'cfo@enterprise.ai', 5000.0, 142.50, 14)")
+DB.execute("CREATE TABLE IF NOT EXISTS api_keys (key TEXT PRIMARY KEY, email TEXT, cap REAL, spent REAL)")
+DB.execute("INSERT OR IGNORE INTO api_keys VALUES ('optx_live_demo', 'cfo@enterprise.ai', 5000.0, 142.50)")
 DB.commit()
 
-SEMANTIC_CACHE: Dict[str, str] = {}
 METRICS = {"saved": 14280.00, "margin": 38.4, "pii": 1240, "liab": 250000, "traps": 11}
-MODEL_RATES = {"gpt-4o-mini": 0.0006, "claude-3-5-sonnet": 0.015, "gemini-2.5-flash": 0.0003}
 
 class OpenAIReq(BaseModel):
     model: Optional[str] = "gpt-4o-mini"
     messages: List[Dict[str, Any]]
-    stream: Optional[bool] = False
 
 def scrub(text: str):
     pmap, cnt = dict(), 0
@@ -39,43 +35,34 @@ def scrub(text: str):
     return text, pmap, cnt
 
 async def route_ai(prompt: str, model: str, auth: Optional[str]) -> tuple[str, str]:
-    ckey = f"{model}:{hashlib.sha256(prompt.encode()).hexdigest()[:16]}"
-    if ckey in SEMANTIC_CACHE:
-        return SEMANTIC_CACHE[ckey], f"{model}-semantic-cache-hit"
     m = model.lower()
     tok = auth.replace("Bearer ", "").strip() if (auth and auth.startswith("Bearer ") and not auth.startswith("Bearer optx_")) else ""
     async with httpx.AsyncClient(timeout=12.0) as client:
         if "claude" in m and (tok or ANTHROPIC_KEY):
             try:
                 r = await client.post("https://anthropic.com", headers={"x-api-key": tok or ANTHROPIC_KEY, "anthropic-version": "2023-06-01"}, json={"model": "claude-3-5-sonnet-20241022", "max_tokens": 512, "messages": [{"role": "user", "content": prompt}]})
-                if r.status_code == 200 and r.json().get("content"):
-                    ans = r.json()["content"][0].get("text", "")
-                    SEMANTIC_CACHE[ckey] = ans; return ans, "anthropic-claude-3-5-sonnet-live"
+                if r.status_code == 200 and r.json().get("content"): return r.json()["content"][0].get("text", ""), "anthropic-claude-3-5-sonnet-live"
             except Exception: pass
         if "gemini" in m and (tok or GEMINI_KEY):
             try:
                 r = await client.post(f"https://googleapis.com{tok or GEMINI_KEY}", json={"contents": [{"parts": [{"text": prompt}]}]})
-                if r.status_code == 200 and r.json().get("candidates"):
-                    ans = r.json()["candidates"][0]["content"]["parts"][0].get("text", "")
-                    SEMANTIC_CACHE[ckey] = ans; return ans, "google-gemini-2.5-flash-live"
+                if r.status_code == 200 and r.json().get("candidates"): return r.json()["candidates"][0]["content"]["parts"][0].get("text", ""), "google-gemini-2.5-flash-live"
             except Exception: pass
         if (tok or OPENAI_KEY):
             try:
                 r = await client.post("https://openai.com", headers={"Authorization": f"Bearer {tok or OPENAI_KEY}"}, json={"model": "gpt-4o-mini", "messages": [{"role": "user", "content": prompt}]})
-                if r.status_code == 200 and r.json().get("choices"):
-                    ans = r.json()["choices"][0]["message"].get("content", "")
-                    SEMANTIC_CACHE[ckey] = ans; return ans, "openai-gpt-4o-mini-live"
+                if r.status_code == 200 and r.json().get("choices"): return r.json()["choices"][0]["message"].get("content", ""), "openai-gpt-4o-mini-live"
             except Exception: pass
     return f"[OptiMax Cost-Optimized Edge ({model})] Verified Safe: {prompt}", f"optimax-{model}-failover-node"
 
-def page(out: str = "Ready — run a CFO ROI projection, issue a persistent budget-capped key, or test PII & Liability protection..."):
+def page(out: str = "Ready — run a CFO ROI projection, issue a budget-capped key, or test PII & Liability protection..."):
     m = METRICS
     logo = "<svg width='28' height='28' viewBox='0 0 32 32' fill='none' style='vertical-align:middle;margin-right:8px;'><path d='M16 2L4 7V15C4 22.5 9.1 29.4 16 31C22.9 29.4 28 22.5 28 15V7L16 2Z' fill='#0f172a' stroke='#38bdf8' stroke-width='2.2'/><path d='M16 8L10 22H13.5L16 15.5L18.5 22H22L16 8Z' fill='#38bdf8'/></svg>"
     c = "background:#0f172a;border:1px solid #1e293b;border-radius:10px;padding:14px;text-align:center;"
     b = "display:inline-block;padding:10px 14px;border-radius:8px;font-weight:bold;text-decoration:none;color:#fff;border:none;margin:8px 6px 0 0;cursor:pointer;"
     i = "width:100%;background:#03050a;color:#7dd3fc;border:1px solid #1e293b;border-radius:8px;padding:10px;margin-top:8px;box-sizing:border-box;"
     ft = "<div style='margin-top:24px;padding-top:12px;border-top:1px solid #1e293b;font-size:12px;color:#94a3b8;display:flex;justify-content:space-between;'><span>© 2026 OptiMax AI • Enterprise AI Spend & Risk Governance</span><span><a href='/terms' style='color:#38bdf8;'>Terms</a> • <a href='/privacy' style='color:#38bdf8;'>Privacy</a> • <a href='/refunds' style='color:#38bdf8;'>Refund Policy</a></span></div>"
-    return f"<!DOCTYPE html><html><body style='font-family:sans-serif;background:#050811;color:#f1f5f9;padding:24px;'><div style='max-width:1040px;margin:0 auto;'><div style='display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #1e293b;padding-bottom:12px;'><div>{logo}<b style='font-size:20px;vertical-align:middle;'>OPTIMAX<span style='color:#38bdf8;'>.AI</span></b> <small style='color:#64748b;'>CFO AI SPEND & RISK GOVERNANCE</small></div><a href='/health' target='_blank' style='color:#34d399;text-decoration:none;font-size:12px;'>● LIVE SLA & DB TELEMETRY</a></div><div style='display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:16px 0;'><div style='{c}'><small style='color:#64748b;'>VERIFIED SAVINGS</small><h3 style='color:#34d399;margin:6px 0 0;'>${m['saved']:,.2f}</h3></div><div style='{c}'><small style='color:#64748b;'>COST REDUCTION</small><h3 style='color:#38bdf8;margin:6px 0 0;'>{m['margin']}%</h3></div><div style='{c}'><small style='color:#64748b;'>LIABILITY BLOCKED</small><h3 style='color:#f87171;margin:6px 0 0;'>${m['liab']:,}</h3></div><div style='{c}'><small style='color:#64748b;'>PII LEAKS STOPPED</small><h3 style='color:#fbbf24;margin:6px 0 0;'>{m['pii']:,}</h3></div><div style='{c}'><small style='color:#64748b;'>CANARY TRAPS</small><h3 style='color:#a78bfa;margin:6px 0 0;'>{m['traps']}</h3></div></div><form method='get' action='/roi'><input name='spend' type='number' value='25000' placeholder='Monthly OpenAI/Claude Spend ($ USD)' style='{i}'><button style='{b}background:#0284c7;'>Calculate Annual CFO Savings & ROI</button></form><form method='get' action='/key'><input name='email' placeholder='finance-ops@company.com' style='{i}'><input name='cap' type='number' value='2500' placeholder='Hard Monthly Spend Cap ($ USD)' style='{i}'><button style='{b}background:#059669;'>Issue Persistent Budget-Capped Key</button></form><form method='get' action='/test'><select name='model' style='{i}'><option value='gpt-4o-mini'>Smart Cost-Router: GPT-4o-Mini</option><option value='claude-3-5-sonnet'>Enterprise Reasoning: Claude 3.5 Sonnet</option><option value='gemini-2.5-flash'>High-Margin Fast Tier: Gemini 2.5 Flash</option></select><input name='q' value='Confirm renewal for sarah@enterprise.com card 4532 1234 5678 9010' style='{i}'><button style='{b}background:#2563eb;'>Test PII Redaction & Token Metering</button><a href='/test?q=90%25+discount+approved&model=gpt-4o-mini' style='{b}background:#dc2626;'>Test Unauthorized Discount Block</a><a href='/canary' style='{b}background:#d97706;'>Trigger Canary Trap</a></form><pre style='background:#03050a;padding:14px;border-radius:8px;color:#34d399;overflow-x:auto;'>{out}</pre><div style='display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:16px;'><div style='{c}'><h4>Starter Governance</h4><h2 style='color:#34d399;'>$49/mo</h2><p style='font-size:12px;color:#94a3b8;'>Up to $5k/mo AI Spend • Hard Caps • 14-Day Trial</p><a href='/subscribe/starter' style='{b}background:#059669;'>Start 14-Day Trial</a></div><div style='{c}'><h4>Growth CFO Suite</h4><h2 style='color:#38bdf8;'>$499/mo</h2><p style='font-size:12px;color:#94a3b8;'>Up to $50k/mo AI Spend • Smart Cache • 14-Day Trial</p><a href='/subscribe/growth' style='{b}background:#2563eb;'>Start Growth Trial</a></div><div style='{c}'><h4>Enterprise Treasury</h4><h2 style='color:#a78bfa;'>$15,000/mo</h2><p style='font-size:12px;color:#94a3b8;'>Unlimited Spend • SSE Streaming • Audit Ledger</p><a href='/subscribe/enterprise' style='{b}background:#7c3aed;'>Request Enterprise MSA</a></div></div>{ft}</div></body></html>"
+    return f"<!DOCTYPE html><html><body style='font-family:sans-serif;background:#050811;color:#f1f5f9;padding:24px;'><div style='max-width:1040px;margin:0 auto;'><div style='display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #1e293b;padding-bottom:12px;'><div>{logo}<b style='font-size:20px;vertical-align:middle;'>OPTIMAX<span style='color:#38bdf8;'>.AI</span></b> <small style='color:#64748b;'>CFO AI SPEND & RISK GOVERNANCE</small></div><a href='/health' target='_blank' style='color:#34d399;text-decoration:none;font-size:12px;'>● LIVE SLA & DB TELEMETRY</a></div><div style='display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:16px 0;'><div style='{c}'><small style='color:#64748b;'>VERIFIED SAVINGS</small><h3 style='color:#34d399;margin:6px 0 0;'>${m['saved']:,.2f}</h3></div><div style='{c}'><small style='color:#64748b;'>COST REDUCTION</small><h3 style='color:#38bdf8;margin:6px 0 0;'>{m['margin']}%</h3></div><div style='{c}'><small style='color:#64748b;'>LIABILITY BLOCKED</small><h3 style='color:#f87171;margin:6px 0 0;'>${m['liab']:,}</h3></div><div style='{c}'><small style='color:#64748b;'>PII LEAKS STOPPED</small><h3 style='color:#fbbf24;margin:6px 0 0;'>{m['pii']:,}</h3></div><div style='{c}'><small style='color:#64748b;'>CANARY TRAPS</small><h3 style='color:#a78bfa;margin:6px 0 0;'>{m['traps']}</h3></div></div><form method='get' action='/roi'><input name='spend' type='number' value='25000' placeholder='Monthly OpenAI/Claude Spend ($ USD)' style='{i}'><button style='{b}background:#0284c7;'>Calculate Annual CFO Savings & ROI</button></form><form method='get' action='/key'><input name='email' placeholder='finance-ops@company.com' style='{i}'><input name='cap' type='number' value='2500' placeholder='Hard Monthly Spend Cap ($ USD)' style='{i}'><button style='{b}background:#059669;'>Issue Persistent Budget-Capped Key</button></form><form method='get' action='/test'><select name='model' style='{i}'><option value='gpt-4o-mini'>Smart Cost-Router: GPT-4o-Mini</option><option value='claude-3-5-sonnet'>Enterprise Reasoning: Claude 3.5 Sonnet</option><option value='gemini-2.5-flash'>High-Margin Fast Tier: Gemini 2.5 Flash</option></select><input name='q' value='Confirm renewal for sarah@enterprise.com card 4532 1234 5678 9010' style='{i}'><button style='{b}background:#2563eb;'>Test PII Redaction & Token Metering</button><a href='/test?q=90%25+discount+approved&model=gpt-4o-mini' style='{b}background:#dc2626;'>Test Unauthorized Discount Block</a><a href='/canary' style='{b}background:#d97706;'>Trigger Canary Trap</a></form><pre style='background:#03050a;padding:14px;border-radius:8px;color:#34d399;overflow-x:auto;'>{out}</pre><div style='display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:16px;'><div style='{c}'><h4>Starter Governance</h4><h2 style='color:#34d399;'>$49/mo</h2><p style='font-size:12px;color:#94a3b8;'>Up to $5k/mo AI Spend • 14-Day Trial</p><a href='/subscribe/starter' style='{b}background:#059669;'>Start 14-Day Trial</a></div><div style='{c}'><h4>Growth CFO Suite</h4><h2 style='color:#38bdf8;'>$499/mo</h2><p style='font-size:12px;color:#94a3b8;'>Up to $50k/mo AI Spend • 14-Day Trial</p><a href='/subscribe/growth' style='{b}background:#2563eb;'>Start Growth Trial</a></div><div style='{c}'><h4>Enterprise Treasury</h4><h2 style='color:#a78bfa;'>$15,000/mo</h2><p style='font-size:12px;color:#94a3b8;'>Unlimited Spend • Audit Ledger</p><a href='/subscribe/enterprise' style='{b}background:#7c3aed;'>Request Enterprise MSA</a></div></div>{ft}</div></body></html>"
 
 @app.get("/", response_class=HTMLResponse)
 async def home(): return page()
@@ -83,9 +70,21 @@ async def home(): return page()
 @app.get("/roi", response_class=HTMLResponse)
 async def calc_roi(spend: float = Query(25000.0)):
     yr = spend * 12; sav = round(yr * 0.384, 2); net = round(sav - 5988, 2)
-    return page(f"EXECUTIVE CFO ROI PROJECTION\nCurrent Annual AI Spend: ${annual if 'annual' in locals() else yr:,.2f}\nProjected OptiMax Savings (38.4%): ${sav:,.2f}/yr\nOptiMax Growth License: $5,988.00/yr\nNET ANNUAL EBITDA IMPACT: +${net:,.2f} (Payback: < 11 days)")
+    return page(f"EXECUTIVE CFO ROI PROJECTION\nAnnual AI Spend: ${yr:,.2f}\nProjected Savings (38.4%): ${sav:,.2f}/yr\nNet Annual EBITDA Impact: +${net:,.2f} (Payback: < 11 days)")
 
 @app.get("/subscribe/{tier}", response_class=HTMLResponse)
 async def sub(tier: str): return page(f"PLAN SELECTED: OptiMax {tier.upper()} — Contact support.auranova23@gmail.com for onboarding.")
 
 @app.get("/terms", response_class=HTMLResponse)
+async def terms(): return page("TERMS OF SERVICE: OptiMax AI provides B2B AI cost governance & PII redaction ($49, $499, or $15,000 USD/mo).")
+
+@app.get("/privacy", response_class=HTMLResponse)
+async def privacy(): return page("PRIVACY POLICY: OptiMax AI redacts PII in memory before routing and retains zero customer payload data.")
+
+@app.get("/refunds", response_class=HTMLResponse)
+async def refunds(): return page("REFUND POLICY: 14-day free trial included. Full refunds available within 14 days via support.auranova23@gmail.com.")
+
+@app.get("/key", response_class=HTMLResponse)
+async def make_key(email: str = Query(""), cap: float = Query(2500.0)):
+    k = "optx_live_" + secrets.token_hex(8)
+    DB.execute("INSERT INTO api_keys VALUES (?, ?, ?, 0.0)", (k, email, cap)); DB.commit()
