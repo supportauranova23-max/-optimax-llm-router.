@@ -187,3 +187,47 @@ HTML_PAGE = (
 async def home():
     return HTMLResponse(content=HTML_PAGE)
 
+@app.get("/", response_class=HTMLResponse)
+async def home():
+    return HTMLResponse(content=HTML_PAGE)
+
+@app.post("/start-trial", response_class=HTMLResponse)
+async def start_trial(name: str = Form(...), email: str = Form(...)):
+    conn, ph = get_db()
+    cur = conn.cursor()
+    cur.execute(f"SELECT api_key FROM users_live WHERE email = {ph}", (email,))
+    row = cur.fetchone()
+    if row:
+        key = row
+    else:
+        key = f"optx_trial_{secrets.token_hex(8)}"
+        cur.execute(f"INSERT INTO users_live VALUES ({ph},{ph},{ph},{ph},{ph},{ph},{ph})", (key, name, email, "trial", datetime.utcnow().isoformat(), 0, 0.0))
+        conn.commit()
+    cur.close()
+    conn.close()
+    return HTMLResponse(content=f"<body style='background:#0d1117;color:#fff;font-family:sans-serif;text-align:center;padding:50px'><h2 style='color:#3fb950'>Trial Active!</h2><p>Your API Key: <b style='color:#58a6ff'>{key}</b></p><a href='/' style='color:#58a6ff'>Back to Gateway</a></body>")
+
+@app.get("/upgrade")
+async def upgrade():
+    return RedirectResponse(url=LEMON_URL, status_code=303)
+
+@app.post("/v1/route")
+async def route(req: PromptRequest, user: dict = Depends(verify_user)):
+    await check_loop(user["token"], req.prompt)
+    clean_p, vault = scan_and_redact(req.prompt)
+    c_key = hashlib.sha256(clean_p.lower().encode()).hexdigest()
+    conn, ph = get_db()
+    cur = conn.cursor()
+    cur.execute(f"UPDATE users_live SET usage_count = {ph}, saved_usd = {ph} WHERE api_key = {ph}", (user["usage"] + 1, round(user["saved"] + 0.015, 4), user["token"]))
+    conn.commit()
+    cur.close()
+    conn.close()
+    if req.stream:
+        return StreamingResponse(upstream_stream(clean_p, req.preferred_model, vault, c_key), media_type="text/event-stream")
+    chunks = []
+    async for line in upstream_stream(clean_p, req.preferred_model, vault, c_key):
+        if line.startswith("data: ") and line != "data: [DONE]\n\n":
+            chunks.append(json.loads(line[6:])["choices"]["delta"].get("content", ""))
+    return {"status": "success", "response": "".join(chunks)}
+
+
