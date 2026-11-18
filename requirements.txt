@@ -4,3 +4,4 @@ pydantic
 openai
 google-genai
 httpx
+python-multipart
