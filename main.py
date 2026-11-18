@@ -10,22 +10,17 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel
 from typing import Optional
 
-# ---> COGNISHIELD FIREWALL
 from cognishield_layer import CogniShieldLayer
-
-# ---> REAL AI PROVIDER SDKs
 from openai import OpenAI
 from google import genai
 
 app = FastAPI(title="OptiMax: Intelligent AI API Cost Management Router")
 
-# Load Keys & Checkout Links from Render Environment Variables
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 LEMON_CHECKOUT_URL = os.environ.get("LEMON_CHECKOUT_URL", "https://lemonsqueezy.com")
 LEMON_WEBHOOK_SECRET = os.environ.get("LEMON_WEBHOOK_SECRET", "")
 
-# Initialize AI Clients
 openai_client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 gemini_client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 
@@ -33,7 +28,7 @@ shield = CogniShieldLayer()
 DB_FILE = "optimax_v2.db"
 TRIAL_DAYS = 14
 
-# ---> DATABASE INITIALIZATION (SQLite with 14-Day Trial Tracking)
+
 def init_db():
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
@@ -60,14 +55,16 @@ def init_db():
     conn.commit()
     conn.close()
 
+
 init_db()
+
 
 class PromptRequest(BaseModel):
     prompt: str
     preferred_model: Optional[str] = "auto"
 
-DASHBOARD_HTML = """
-<!DOCTYPE html>
+
+DASHBOARD_HTML = """<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -130,58 +127,59 @@ DASHBOARD_HTML = """
         </div>
     </div>
 </body>
-</html>
-"""
+</html>"""
+
 
 async def verify_api_key_and_billing(authorization: Optional[str] = Header(None)):
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing or malformed credentials structure.")
     parts = authorization.split(" ")
     if len(parts) != 2:
-        raise HTTPException(status_code=401, detail="Invalid Authorization header format. Use 'Bearer <API_KEY>'.")
+        raise HTTPException(status_code=401, detail="Invalid Authorization header format.")
     token = parts[1]
-    
+
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     cursor.execute("SELECT name, tier, created_at, usage_count FROM users WHERE api_key = ?", (token,))
     row = cursor.fetchone()
-    
+
     if not row:
         conn.close()
         raise HTTPException(status_code=403, detail="Unauthorized client signature detected.")
-    
+
     name, tier, created_at_str, usage_count = row
-    
-    # Enforce 14-Day (2-Week) Free Trial Expiration Check
+
     if tier == "trial":
         created_at = datetime.fromisoformat(created_at_str)
         expiration_date = created_at + timedelta(days=TRIAL_DAYS)
         if datetime.utcnow() > expiration_date:
             conn.close()
             raise HTTPException(
-                status_code=402, 
+                status_code=402,
                 detail="Payment Required: Your 14-day free trial has expired. Please visit /upgrade to continue using Optimax."
             )
-        
+
     new_usage = usage_count + 1
     cursor.execute("UPDATE users SET usage_count = ? WHERE api_key = ?", (new_usage, token))
     conn.commit()
     conn.close()
-        
+
     return {"api_key": token, "name": name, "tier": tier, "usage_count": new_usage}
+
 
 @app.get("/", response_class=HTMLResponse)
 async def get_dashboard():
     return HTMLResponse(content=DASHBOARD_HTML, status_code=200)
 
+
 @app.post("/start-trial", response_class=HTMLResponse)
 async def start_free_trial(name: str = Form(...), email: str = Form(...)):
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
-    
+
     cursor.execute("SELECT api_key, tier, created_at FROM users WHERE email = ?", (email,))
     existing = cursor.fetchone()
-    
+
     if existing:
         api_key, tier, created_at = existing
         conn.close()
@@ -195,7 +193,7 @@ async def start_free_trial(name: str = Form(...), email: str = Form(...)):
         conn.commit()
         conn.close()
 
-    return f"""
+    html_output = f"""<!DOCTYPE html>
     <html>
     <body style="font-family: 'Segoe UI', sans-serif; background: #0d1117; color: #c9d1d9; padding: 50px; text-align: center;">
         <div style="max-width: 600px; margin: 0 auto; background: #161b22; padding: 30px; border-radius: 8px; border: 1px solid #30363d;">
@@ -211,11 +209,20 @@ async def start_free_trial(name: str = Form(...), email: str = Form(...)):
             </div>
         </div>
     </body>
-    </html>
-    """
+    </html>"""
+    return HTMLResponse(content=html_output, status_code=200)
+
 
 @app.get("/upgrade")
 async def redirect_to_checkout():
     return RedirectResponse(url=LEMON_CHECKOUT_URL, status_code=303)
 
+
 @app.post("/webhook/lemonsqueezy")
+async def lemonsqueezy_webhook(request: Request):
+    payload = await request.body()
+    signature = request.headers.get("X-Signature", "")
+
+    if LEMON_WEBHOOK_SECRET:
+        digest = hmac.new(LEMON_WEBHOOK_SECRET.encode(), payload, hashlib.sha256).hexdigest()
+
