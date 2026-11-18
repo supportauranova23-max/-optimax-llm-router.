@@ -48,17 +48,13 @@ class PromptRequest(BaseModel):
     prompt: str
     preferred_model: Optional[str] = "auto"
 
-DASHBOARD_HTML = '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>OptiMax AI Router</title><style>body{font-family:Segoe UI,sans-serif;background:#0d1117;color:#c9d1d9;margin:0;padding:30px}.container{max-width:850px;margin:0 auto;background:#161b22;padding:25px;border-radius:8px;border:1px solid #30363d}.header{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #30363d;padding-bottom:15px}.logo{width:40px;height:40px;background:linear-gradient(135deg,#1f6feb,#3fb950);border-radius:8px;display:inline-flex;align-items:center;justify-content:center;font-weight:bold;color:#fff;margin-right:10px}h1{color:#58a6ff;margin:0;display:inline;font-size:22px}.badge{padding:5px 12px;background:rgba(63,185,80,0.15);color:#3fb950;border-radius:20px;font-size:13px}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:15px;margin:20px 0}.box{background:#21262d;padding:15px;border-radius:6px;border:1px solid #30363d;text-align:center}.val{font-size:20px;font-weight:bold;color:#3fb950;margin-top:5px}.card{background:#21262d;padding:20px;border-radius:6px;border:1px solid #30363d;margin-top:15px}.btn{display:inline-block;background:#238636;color:#fff;padding:10px 20px;text-decoration:none;border-radius:6px;font-weight:bold;border:none;cursor:pointer;font-size:14px}.blue{background:#1f6feb}input{padding:10px;border-radius:6px;border:1px solid #30363d;background:#0d1117;color:#fff;width:35%;margin-right:8px}pre{background:#0d1117;padding:12px;border-radius:6px;border:1px solid #30363d;color:#79c0ff;overflow-x:auto;font-size:12px}</style></head><body><div class="container"><div class="header"><div><span class="logo">OX</span><h1>OptiMax AI Router & Gateway</h1></div><span class="badge">● Postgres & 14-Day Trial Live</span></div><div class="grid"><div class="box"><div>Trial Period</div><div class="val">14 Days</div></div><div class="box"><div>AI Models</div><div class="val">GPT-4o / Gemini</div></div><div class="box"><div>Billing</div><div class="val" style="color:#58a6ff">Lemon + Payoneer</div></div></div><div class="card"><h3>1. Start Your Free 2-Week Trial</h3><form action="/start-trial" method="post"><input type="text" name="name" placeholder="Your Name" required><input type="email" name="email" placeholder="Work Email" required><button type="submit" class="btn blue">Get 14-Day Trial Key</button></form></div><div class="card"><h3>2. Developer API Endpoint</h3><pre>POST https://onrender.com | Header: Authorization: Bearer YOUR_KEY</pre></div><div class="card" style="text-align:center"><h3>3. Test & Upgrade</h3><a class="btn blue" href="/docs" style="margin-right:10px">Open API Playground</a><a class="btn" href="/upgrade">Upgrade Account ($49/mo)</a></div></div></body></html>'
-
-TRIAL_HTML = '<!DOCTYPE html><html><body style="font-family:Segoe UI,sans-serif;background:#0d1117;color:#c9d1d9;padding:40px;text-align:center"><div style="max-width:550px;margin:0 auto;background:#161b22;padding:25px;border-radius:8px;border:1px solid #30363d"><h2 style="color:#3fb950">Your 14-Day Free Trial is Active!</h2><p>Copy your Bearer API Key:</p><div style="background:#0d1117;padding:15px;border-radius:6px;border:1px solid #58a6ff;font-family:monospace;font-size:16px;color:#58a6ff;margin:15px 0">__KEY__</div><p style="font-size:13px;color:#8b949e">Valid for 14 days from __DATE__ (__EMAIL__).</p><a href="/docs" style="display:inline-block;background:#1f6feb;color:#fff;padding:12px 20px;text-decoration:none;border-radius:6px;font-weight:bold;margin-top:10px">Open API Playground</a></div></body></html>'
-
 async def verify_user(authorization: Optional[str] = Header(None)):
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing Bearer token.")
     parts = authorization.split(" ")
     if len(parts) != 2:
         raise HTTPException(status_code=401, detail="Invalid header format.")
-    token = parts[1]
+    token = parts
     conn = get_db()
     cur = conn.cursor()
     cur.execute("SELECT name, tier, created_at, usage_count FROM users WHERE api_key = %s", (token,))
@@ -81,7 +77,8 @@ async def verify_user(authorization: Optional[str] = Header(None)):
 
 @app.get("/", response_class=HTMLResponse)
 async def dashboard():
-    return HTMLResponse(content=DASHBOARD_HTML)
+    with open("index.html", "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
 
 @app.post("/start-trial", response_class=HTMLResponse)
 async def start_trial(name: str = Form(...), email: str = Form(...)):
@@ -98,7 +95,7 @@ async def start_trial(name: str = Form(...), email: str = Form(...)):
         conn.commit()
     cur.close()
     conn.close()
-    return HTMLResponse(content=TRIAL_HTML.replace("__KEY__", api_key).replace("__DATE__", created_at[:10]).replace("__EMAIL__", email))
+    return HTMLResponse(content=f"<body style='background:#0d1117;color:#c9d1d9;font-family:sans-serif;text-align:center;padding:50px'><h2 style='color:#3fb950'>14-Day Trial Active!</h2><p>Your API Key: <b style='color:#58a6ff'>{api_key}</b></p><a href='/docs' style='color:#58a6ff'>Open API Playground</a></body>")
 
 @app.get("/upgrade")
 async def upgrade():
@@ -113,15 +110,15 @@ async def webhook(request: Request):
         if not hmac.compare_digest(digest, sig):
             raise HTTPException(status_code=401, detail="Invalid signature.")
     data = await request.json()
-    event = data.get("meta", {}).get("event_name")
-    email = data.get("data", {}).get("attributes", {}).get("user_email")
-    if event in ["order_created", "subscription_created"] and email:
-        conn = get_db()
-        cur = conn.cursor()
-        cur.execute("UPDATE users SET tier = 'premium' WHERE email = %s", (email,))
-        conn.commit()
-        cur.close()
-        conn.close()
+    if data.get("meta", {}).get("event_name") in ["order_created", "subscription_created"]:
+        email = data.get("data", {}).get("attributes", {}).get("user_email")
+        if email:
+            conn = get_db()
+            cur = conn.cursor()
+            cur.execute("UPDATE users SET tier = 'premium' WHERE email = %s", (email,))
+            conn.commit()
+            cur.close()
+            conn.close()
     return {"status": "ok"}
 
 @app.post("/v1/route")
@@ -130,9 +127,7 @@ async def route_prompt(request: PromptRequest, user: dict = Depends(verify_user)
     verdict = shield.inspect_payload(request.prompt)
     if not verdict.get("safe", True):
         raise HTTPException(status_code=400, detail=f"Blocked: {verdict.get('reason')}")
-    provider = request.preferred_model
-    if provider == "auto":
-        provider = "gemini" if len(request.prompt.split()) < 15 else "openai"
+    provider = request.preferred_model if request.preferred_model != "auto" else ("gemini" if len(request.prompt.split()) < 15 else "openai")
     try:
         if provider == "gemini":
             if not gemini_client:
@@ -143,5 +138,9 @@ async def route_prompt(request: PromptRequest, user: dict = Depends(verify_user)
             if not openai_client:
                 raise HTTPException(status_code=503, detail="OPENAI_API_KEY missing.")
             res = openai_client.chat.completions.create(model="gpt-4o-mini", messages=[{"role": "user", "content": request.prompt}])
-            text, model = res.choices[0].message.content, "gpt-4o-mini"
+            text, model = res.choices.message.content, "gpt-4o-mini"
         else:
+            raise HTTPException(status_code=400, detail="Invalid model.")
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    return {"status": "success", "tenant": user["name"], "tier": user["tier"], "requests_used": user["usage_count"], "latency_ms": round((time.time() - start) * 1000, 2), "model": model, "response": text}
