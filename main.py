@@ -123,8 +123,9 @@ DASHBOARD_HTML = """
         </div>
 
         <div class="card" style="text-align: center;">
-            <h3>Upgrade to Optimax Enterprise Unlimited</h3>
-            <p>Keep uninterrupted sub-token proxy calls, dedicated clusters, and priority fallback routing after your 14-day trial.</p>
+            <h3>Enterprise Access & Interactive Testing</h3>
+            <p>Test your API key live in our interactive playground or upgrade for uninterrupted enterprise clusters.</p>
+            <a class="btn-pay btn-blue" href="/docs" style="margin-right: 10px;">Open API Playground</a>
             <a class="btn-pay" href="/upgrade">Upgrade Account ($49/mo)</a>
         </div>
     </div>
@@ -135,7 +136,10 @@ DASHBOARD_HTML = """
 async def verify_api_key_and_billing(authorization: Optional[str] = Header(None)):
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing or malformed credentials structure.")
-    token = authorization.split(" ")[1]
+    parts = authorization.split(" ")
+    if len(parts) != 2:
+        raise HTTPException(status_code=401, detail="Invalid Authorization header format. Use 'Bearer <API_KEY>'.")
+    token = parts[1]
     
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
@@ -175,7 +179,6 @@ async def start_free_trial(name: str = Form(...), email: str = Form(...)):
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
     
-    # Check if email already registered
     cursor.execute("SELECT api_key, tier, created_at FROM users WHERE email = ?", (email,))
     existing = cursor.fetchone()
     
@@ -197,12 +200,15 @@ async def start_free_trial(name: str = Form(...), email: str = Form(...)):
     <body style="font-family: 'Segoe UI', sans-serif; background: #0d1117; color: #c9d1d9; padding: 50px; text-align: center;">
         <div style="max-width: 600px; margin: 0 auto; background: #161b22; padding: 30px; border-radius: 8px; border: 1px solid #30363d;">
             <h2 style="color: #3fb950;">Your 14-Day Free Trial is Active!</h2>
-            <p>Use this Bearer API Key in your Authorization header to route requests:</p>
+            <p>Copy your Bearer API Key below to test your router:</p>
             <div style="background: #0d1117; padding: 15px; border-radius: 6px; border: 1px solid #58a6ff; font-family: monospace; font-size: 16px; color: #58a6ff; margin: 20px 0;">
                 {api_key}
             </div>
             <p style="font-size: 14px; color: #8b949e;">Trial valid for 14 days from {created_at[:10]}. Upgrade anytime using the same email ({email}) to unlock unlimited access automatically.</p>
-            <a href="/" style="display: inline-block; margin-top: 15px; color: #58a6ff; text-decoration: none;">← Back to Dashboard</a>
+            <div style="margin-top: 25px;">
+                <a href="/docs" style="display: inline-block; background: #1f6feb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-right: 10px;">Test Key in API Playground →</a>
+                <a href="/" style="display: inline-block; color: #58a6ff; text-decoration: none; padding: 12px;">← Back to Dashboard</a>
+            </div>
         </div>
     </body>
     </html>
@@ -213,14 +219,3 @@ async def redirect_to_checkout():
     return RedirectResponse(url=LEMON_CHECKOUT_URL, status_code=303)
 
 @app.post("/webhook/lemonsqueezy")
-async def lemonsqueezy_webhook(request: Request):
-    payload = await request.body()
-    signature = request.headers.get("X-Signature", "")
-    
-    if LEMON_WEBHOOK_SECRET:
-        digest = hmac.new(LEMON_WEBHOOK_SECRET.encode(), payload, hashlib.sha256).hexdigest()
-        if not hmac.compare_digest(digest, signature):
-            raise HTTPException(status_code=401, detail="Invalid webhook signature.")
-            
-    data = await request.json()
-    event_name = data.get("meta", {}).get("event_name")
