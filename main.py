@@ -158,3 +158,8 @@ async def route_prompt(request: PromptRequest, user: dict = Depends(verify_user)
             res = openai_client.chat.completions.create(model="gpt-4o-mini", messages=[{"role": "user", "content": request.prompt}])
             text, model = res.choices[0].message.content, "gpt-4o-mini"
         else:
+                        raise HTTPException(status_code=400, detail="Invalid model.")
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    return {"status": "success", "tenant": user["name"], "tier": user["tier"], "requests_used": user["usage_count"], "latency_ms": round((time.time() - start) * 1000, 2), "model": model, "response": text}
+
