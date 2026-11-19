@@ -1,6 +1,6 @@
-import time, os, json, httpx, sqlite3, hashlib, secrets
+import time, os, re, json, httpx, sqlite3, hashlib, secrets
 from datetime import datetime, timedelta
-from fastapi import FastAPI, HTTPException, Header, Depends, Form
+from fastapi import FastAPI, HTTPException, Header, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel
 from typing import Optional, Dict
@@ -13,6 +13,7 @@ except ImportError:
 
 app = FastAPI(title="OptiMax Quantum Gateway")
 
+OPENAI_KEY = os.environ.get("OPENAI_API_KEY", "")
 GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "")
 OPENROUTER_KEY = os.environ.get("OPENROUTER_API_KEY", "")
 LEMON_PRO = os.environ.get("LEMON_PRO_URL", "https://lemonsqueezy.com")
@@ -49,6 +50,20 @@ class PromptReq(BaseModel):
     prompt: str
     model: Optional[str] = "auto"
 
+def pii_mask(text: str):
+    vault = {}
+    for label, pat in {"EMAIL": r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+", "CARD": r"\b(?:\d[ -]*?){13,16}\b"}.items():
+        for i, m in enumerate(re.findall(pat, text)):
+            tok = f"[{label}_{i}]"
+            vault[tok] = m
+            text = text.replace(m, tok, 1)
+    return " ".join(text.split()), vault
+
+def pii_restore(text: str, vault: Dict[str, str]):
+    for k, v in vault.items():
+        text = text.replace(k, v)
+    return text
+
 async def verify_user(authorization: Optional[str] = Header(None)):
     if not authorization or not authorization.strip().startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing Bearer token.")
@@ -68,8 +83,11 @@ async def verify_user(authorization: Optional[str] = Header(None)):
 
 @app.get("/", response_class=HTMLResponse)
 async def home():
-    with open("index.html", "r", encoding="utf-8") as f:
-        return HTMLResponse(content=f.read())
+    for fname in os.listdir("."):
+        if fname.endswith(".html"):
+            with open(fname, "r", encoding="utf-8") as f:
+                return HTMLResponse(content=f.read())
+    return HTMLResponse(content="<h1>No .html file found in repository</h1>")
 
 @app.get("/v1/models")
 async def list_models():
@@ -103,26 +121,65 @@ async def start_trial(name: str = Form(...), email: str = Form(...)):
 async def upgrade(plan: str = "pro"):
     return RedirectResponse(url={"pro": LEMON_PRO, "scale": LEMON_SCALE, "enterprise": LEMON_ENT}.get(plan, LEMON_PRO), status_code=303)
 
+@app.post("/webhook/lemonsqueezy")
+async def webhook(request: Request):
+    data = await request.json()
+    if data.get("meta", {}).get("event_name") in ["order_created", "subscription_created"]:
+        email = data.get("data", {}).get("attributes", {}).get("user_email")
+        if email:
+            conn, ph = get_db()
+            cur = conn.cursor()
+            cur.execute(f"UPDATE q_keys SET tier = 'enterprise' WHERE email = {ph}", (email,))
+            conn.commit()
+            cur.close()
+            conn.close()
+    return {"status": "ok"}
+
 @app.post("/v1/route")
 async def route(req: PromptReq, user: dict = Depends(verify_user)):
     t0 = time.perf_counter()
     verdict = shield.inspect_payload(req.prompt)
     if not verdict.get("safe", True):
         raise HTTPException(status_code=400, detail=f"Blocked: {verdict.get('reason')}")
-    c_key = hashlib.sha256(req.prompt.strip().lower().encode()).hexdigest()
+    clean_p, vault = pii_mask(req.prompt)
+    c_key = hashlib.sha256(clean_p.lower().encode()).hexdigest()
     if c_key in CACHE:
-        return {"status": "success", "model": "semantic-cache", "cached": True, "latency_ms": 1.2, "response": CACHE[c_key]}
+        return {"status": "success", "pii_masked": len(vault), "model": "semantic-cache", "cached": True, "latency_ms": 1.2, "response": pii_restore(CACHE[c_key], vault)}
     ans, used = "", ""
     if GEMINI_KEY and req.model in ["auto", "google/gemini-2.5-flash"]:
-        r = await http.post(f"https://googleapis.com{GEMINI_KEY}", json={"contents": [{"parts": [{"text": req.prompt}]}]})
+        r = await http.post(f"https://googleapis.com{GEMINI_KEY}", json={"contents": [{"parts": [{"text": clean_p}]}]})
         if r.status_code == 200:
-            ans, used = r.json()["candidates"]["content"]["parts"]["text"], "google/gemini-2.5-flash"
+            ans, used = r.json()["candidates"][0]["content"]["parts"][0]["text"], "google/gemini-2.5-flash"
+    if not ans and OPENAI_KEY and req.model in ["auto", "openai/gpt-4o-mini"]:
+        r = await http.post("https://openai.com", headers={"Authorization": f"Bearer {OPENAI_KEY}"}, json={"model": "gpt-4o-mini", "messages": [{"role": "user", "content": clean_p}]})
+        if r.status_code == 200:
+            ans, used = r.json()["choices"][0]["message"]["content"], "openai/gpt-4o-mini"
     if not ans and OPENROUTER_KEY:
         target = "meta-llama/llama-3.3-70b-instruct:free" if req.model == "auto" else req.model
-        r = await http.post("https://openrouter.ai", headers={"Authorization": f"Bearer {OPENROUTER_KEY}"}, json={"model": target, "messages": [{"role": "user", "content": req.prompt}]})
+        r = await http.post("https://openrouter.ai", headers={"Authorization": f"Bearer {OPENROUTER_KEY}"}, json={"model": target, "messages": [{"role": "user", "content": clean_p}]})
         if r.status_code == 200:
-            ans, used = r.json()["choices"]["message"]["content"], target
+            ans, used = r.json()["choices"][0]["message"]["content"], target
     if not ans:
-        raise HTTPException(status_code=502, detail="Add GEMINI_API_KEY or OPENROUTER_API_KEY in Render.")
+        raise HTTPException(status_code=502, detail="Add GEMINI_API_KEY, OPENAI_API_KEY, or OPENROUTER_API_KEY in Render.")
     CACHE[c_key] = ans
-    return {"status": "success", "coding_cost_cut": "74.3%", "model": used, "latency_ms": round((time.perf_counter() - t0) * 1000, 2), "response": ans}
+    return {"status": "success", "pii_masked": len(vault), "coding_cost_cut": "74.3%", "model": used, "latency_ms": round((time.perf_counter() - t0) * 1000, 2), "response": pii_restore(ans, vault)}
+
+@app.post("/v1/chat/completions")
+async def openai_dropin(req: dict, user: dict = Depends(verify_user)):
+    msgs = req.get("messages", [])
+    prompt = msgs[-1].get("content", "") if msgs else ""
+    verdict = shield.inspect_payload(prompt)
+    if not verdict.get("safe", True):
+        raise HTTPException(status_code=400, detail=f"Blocked: {verdict.get('reason')}")
+    clean_p, vault = pii_mask(prompt)
+    ans, used = "", ""
+    if OPENROUTER_KEY:
+        target = "meta-llama/llama-3.3-70b-instruct:free" if req.get("model", "auto") == "auto" else req.get("model")
+        r = await http.post("https://openrouter.ai", headers={"Authorization": f"Bearer {OPENROUTER_KEY}"}, json={"model": target, "messages": [{"role": "user", "content": clean_p}]})
+        if r.status_code == 200:
+            ans, used = r.json()["choices"][0]["message"]["content"], target
+    if not ans and GEMINI_KEY:
+        r = await http.post(f"https://googleapis.com{GEMINI_KEY}", json={"contents": [{"parts": [{"text": clean_p}]}]})
+        if r.status_code == 200:
+            ans, used = r.json()["candidates"][0]["content"]["parts"][0]["text"], "google/gemini-2.5-flash"
+    return {"id": f"chatcmpl-{secrets.token_hex(6)}", "object": "chat.completion", "created": int(time.time()), "model": used, "choices": [{"index": 0, "message": {"role": "assistant", "content": pii_restore(ans, vault)}, "finish_reason": "stop"}]}
