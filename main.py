@@ -98,45 +98,7 @@ async def route_ai(prompt: str, pref: str):
             last_err = str(e)
     raise HTTPException(status_code=502, detail=f"AI Provider Error: {last_err}")
 
-LITELLM_UI = (
-    "<!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width,initial-scale=1'>"
-    "<link rel='icon' type='image/svg+xml' href=\"data:image/svg+xml,<svg xmlns='http://w3.org' viewBox='0 0 40 40'><rect width='40' height='40' rx='10' fill='%2310b981'/><circle cx='20' cy='20' r='9' stroke='white' stroke-width='3.5' fill='none'/></svg>\">"
-    "<title>OptiMax Proxy | Cut Coding Costs by 74%</title><style>"
-    "*{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#090d16;color:#e2e8f0;display:flex;min-height:100vh}"
-    ".side{width:240px;background:#0f172a;border-right:1px solid #1e293b;padding:18px 12px;display:flex;flex-direction:column;justify-content:space-between}"
-    ".logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:17px;color:#fff;padding:0 8px 16px;border-bottom:1px solid #1e293b}"
-    ".badge{background:#1d4ed8;color:#fff;font-size:11px;padding:2px 7px;border-radius:4px}"
-    ".nav{margin-top:14px;display:flex;flex-direction:column;gap:4px}"
-    ".nav button{background:none;border:none;color:#94a3b8;padding:10px 12px;border-radius:6px;text-align:left;font-size:13.5px;font-weight:500;cursor:pointer;display:flex;align-items:center;gap:8px}"
-    ".nav button:hover,.nav button.active{background:#1e293b;color:#fff}.nav button.active{border-left:3px solid #3b82f6}"
-    ".main{flex:1;display:flex;flex-direction:column}.top{height:56px;background:#0f172a;border-bottom:1px solid #1e293b;padding:0 24px;display:flex;align-items:center;justify-content:space-between;font-size:14px}"
-    ".hero{background:linear-gradient(135deg,rgba(37,99,235,0.22),rgba(16,185,129,0.22));border:1px solid #2563eb;border-radius:12px;padding:20px 24px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:15px}"
-    ".hero h2{margin:0 0 6px;font-size:20px;color:#fff}.pct{background:#10b981;color:#052e16;font-weight:800;padding:3px 10px;border-radius:20px;font-size:13px;margin-left:8px}"
-    ".hero p{margin:0;color:#cbd5e1;font-size:13.5px}.cta-start{background:#10b981;color:#052e16;padding:12px 22px;border-radius:8px;font-weight:800;font-size:14px;border:none;cursor:pointer;box-shadow:0 4px 14px rgba(16,185,129,0.35)}"
-    ".cta-start:hover{background:#34d399}"
-    ".wrap{padding:24px;max-width:1050px;width:100%;margin:0 auto}.panel{display:none;background:#0f172a;border:1px solid #1e293b;border-radius:10px;padding:22px}.panel.active{display:block}"
-    ".grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}.stat{background:#0f172a;border:1px solid #1e293b;padding:16px;border-radius:8px}"
-    ".stat small{color:#94a3b8;font-size:12px}.stat div{font-size:20px;font-weight:700;margin-top:4px;color:#fff}"
-    "table{width:100%;border-collapse:collapse;margin-top:12px;font-size:13px}th,td{text-align:left;padding:11px;border-bottom:1px solid #1e293b}th{color:#94a3b8}"
-    "input,select,textarea{width:100%;padding:10px;border-radius:6px;border:1px solid #334155;background:#090d16;color:#fff;margin:6px 0 12px;font-size:13.5px}"
-    ".btn{background:#2563eb;color:#fff;border:none;padding:9px 16px;border-radius:6px;font-weight:600;cursor:pointer;font-size:13px;text-decoration:none;display:inline-block}"
-    ".up{background:#059669;width:100%;text-align:center}pre{background:#090d16;border:1px solid #1e293b;padding:14px;border-radius:6px;color:#34d399;white-space:pre-wrap;min-height:90px;font-size:12.5px}"
-    "@media(max-width:768px){body{flex-direction:column}.side{width:100%}.nav{flex-direction:row;overflow-x:auto}.grid{grid-template-columns:repeat(2,1fr)}}"
-    "</style></head><body>"
-    "<div class='side'><div><div class='logo'>"
-    "<svg width='30' height='30' viewBox='0 0 40 40' fill='none' xmlns='http://w3.org'>"
-    "<defs><linearGradient id='oxGrad' x1='0' y1='0' x2='40' y2='40' gradientUnits='userSpaceOnUse'>"
-    "<stop offset='0%' stop-color='#3b82f6'/><stop offset='100%' stop-color='#10b981'/></linearGradient></defs>"
-    "<rect width='40' height='40' rx='10' fill='url(#oxGrad)'/>"
-    "<path d='M13 20C13 16.134 16.134 13 20 13C23.866 13 27 16.134 27 20C27 23.866 23.866 27 20 27' stroke='white' stroke-width='3.2' stroke-linecap='round'/>"
-    "<path d='M21 17L16 22H21L19 27L25 21H20L21 17Z' fill='white'/>"
-    "</svg> OptiMax <span class='badge'>PROXY</span></div><div class='nav'>"
-    "<button id='btn-test' class='active' onclick=\"tab('test',this)\">⚡ Test Key (Playground)</button>"
-    "<button id='btn-keys' onclick=\"tab('keys',this)\">🔑 Virtual Keys & Trial</button>"
-    "<button id='btn-models' onclick=\"tab('models',this)\">🧠 Models & Endpoints</button>"
-    "<button id='btn-spend' onclick=\"tab('spend',this)\">📊 Cost Savings & Spend</button>"
-    "<button id='btn-docs' onclick=\"tab('docs',this)\">🔌 OpenAI SDK Drop-In</button>"
-    "</div></div><a href='/upgrade' class='btn up'>Upgrade Enterprise ($49)</a></div>"
+UI_B = (
     "<div class='main'><div class='top'><span id='hdr'>Test Key (Playground)</span><span style='color:#10b981;font-size:12px'>● Proxy Healthy • CogniShield Guardrail ON</span></div>"
     "<div class='wrap'>"
     "<div class='hero'><div><h2>📉 Cut AI & Coding Costs Automatically <span class='pct'>SAVE UP TO 74.3%</span></h2>"
@@ -163,8 +125,7 @@ LITELLM_UI = (
     "<tr><td><b>gemini-2.5-flash</b></td><td>Google AI</td><td style='color:#10b981'><b>74% Cheaper</b></td><td style='color:#10b981'>● Healthy</td></tr>"
     "<tr><td><b>gpt-4o-mini</b></td><td>OpenAI</td><td style='color:#10b981'><b>68% Cheaper</b></td><td style='color:#10b981'>● Healthy</td></tr>"
     "<tr><td><b>semantic-cache</b></td><td>OptiMax Memory</td><td style='color:#38bdf8'><b>100% Free ($0.00)</b></td><td style='color:#38bdf8'>● Active</td></tr></tbody></table></div>"
-    "<div id='spend' class='panel'><h3 style='margin-top:0'>Real-Time Coding Cost Reduction & Budget Ledger</h3>"
-    "<div id='spendBars'></div></div>"
+    "<div id='spend' class='panel'><h3 style='margin-top:0'>Real-Time Coding Cost Reduction & Budget Ledger</h3><div id='spendBars'></div></div>"
     "<div id='docs' class='panel'><h3 style='margin-top:0'>1-Line OpenAI SDK Drop-In</h3>"
     "<pre style='color:#93c5fd'>from openai import OpenAI\n\nclient = OpenAI(\n    api_key=\"optx_free_trial_user\",\n    base_url=\"https://onrender.com\"\n)</pre></div>"
     "</div></div><script>"
@@ -172,3 +133,65 @@ LITELLM_UI = (
     "function tab(id,b){document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));document.getElementById(id).classList.add('active');if(b)b.classList.add('active');document.getElementById('hdr').textContent=titles[id];loadStats()}"
     "async function loadStats(){try{const r=await fetch('/v1/admin/stats');const d=await r.json();document.getElementById('rCnt').textContent=d.total_reqs;document.getElementById('savCnt').textContent='$'+d.total_saved.toFixed(2);"
     "document.getElementById('keyTbl').innerHTML=d.keys.map(k=>`<tr><td><b>${k.alias}</b></td><td style='font-family:monospace;color:#38bdf8'>${k.key}</td><td>${k.tier}</td><td>${k.reqs}</td><td style='color:#10b981'>Saved $${k.saved.toFixed(3)} / Spent $${k.spend.toFixed(3)}</td></tr>`).join('');"
+    "document.getElementById('spendBars').innerHTML=d.keys.map(k=>`<div style='margin:12px 0'><div style='display:flex;justify-content:space-between;font-size:13px'><span>${k.alias}</span><span style='color:#10b981'>Saved $${k.saved.toFixed(4)} (Budget: $${k.spend.toFixed(4)} / $${k.budget})</span></div><div style='background:#1e293b;height:8px;border-radius:4px;margin-top:4px'><div style='background:#10b981;height:8px;border-radius:4px;width:${Math.min(100,Math.max(8,(k.saved/(k.saved+k.spend+0.01))*100))}%'></div></div></div>`).join('')}catch(e){}}"
+    "loadStats();"
+    "async function runAI(){const o=document.getElementById('out');o.style.color='#38bdf8';o.textContent='Routing & calculating cost reduction...';const r=await fetch('/v1/route',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+document.getElementById('key').value.trim()},body:JSON.stringify({prompt:document.getElementById('prm').value,model:document.getElementById('mod').value})});const d=await r.json();o.style.color=r.ok?'#34d399':'#f87171';o.textContent=JSON.stringify(d,null,2);loadStats()}"
+    "</script></body></html>"
+)
+
+@app.get("/", response_class=HTMLResponse)
+async def home():
+    return HTMLResponse(content=UI_A + UI_B)
+
+@app.get("/v1/admin/stats")
+async def admin_stats():
+    conn, _ = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT api_key, key_alias, tier, requests, spend_usd, saved_usd, max_budget_usd FROM litellm_keys")
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    keys = [{"key": r[:12] + "...", "alias": r, "tier": r, "reqs": r, "spend": float(r), "saved": float(r), "budget": float(r)} for r in rows]
+    return {"keys": keys, "total_reqs": sum(k["reqs"] for k in keys), "total_saved": sum(k["saved"] for k in keys)}
+
+@app.post("/start-trial", response_class=HTMLResponse)
+async def start_trial(name: str = Form(...), email: str = Form(...)):
+    conn, ph = get_db()
+    cur = conn.cursor()
+    cur.execute(f"SELECT api_key FROM litellm_keys WHERE email = {ph}", (email,))
+    row = cur.fetchone()
+    if row:
+        key = row
+    else:
+        key = f"optx_trial_{secrets.token_hex(8)}"
+        cur.execute(f"INSERT INTO litellm_keys VALUES ({ph},{ph},{ph},{ph},{ph},{ph},{ph},{ph},{ph})", (key, name, email, "trial", datetime.utcnow().isoformat(), 0, 0.0, 0.0, 15.0))
+        conn.commit()
+    cur.close()
+    conn.close()
+    return HTMLResponse(content=f"<body style='background:#090d16;color:#fff;font-family:sans-serif;text-align:center;padding:60px'><h2 style='color:#10b981'>🎉 You're In! 14-Day Trial Key Active</h2><p>Copy Key: <b style='color:#38bdf8'>{key}</b></p><a href='/' style='color:#38bdf8'>← Return to OptiMax Proxy Console</a></body>")
+
+@app.get("/upgrade")
+async def upgrade():
+    return RedirectResponse(url=LEMON_URL, status_code=303)
+
+@app.post("/v1/route")
+async def route(req: PromptReq, user: dict = Depends(verify_user)):
+    t0 = time.perf_counter()
+    verdict = shield.inspect_payload(req.prompt)
+    if not verdict.get("safe", True):
+        raise HTTPException(status_code=400, detail=f"Blocked: {verdict.get('reason')}")
+    ans, used_model, cached = await route_ai(req.prompt, req.model)
+    lat = round((time.perf_counter() - t0) * 1000, 2)
+    raw_cost = round(max(0.0005, (len(req.prompt) + len(ans)) * 0.000001), 6)
+    actual_cost = 0.0 if cached else round(raw_cost * 0.257, 6)
+    saved_call = round(raw_cost - actual_cost, 6)
+    pct_cut = "100.0%" if cached else "74.3%"
+    new_spend = round(user["spend"] + actual_cost, 6)
+    new_saved = round(user["saved"] + saved_call, 6)
+    conn, ph = get_db()
+    cur = conn.cursor()
+    cur.execute(f"UPDATE litellm_keys SET requests = {ph}, spend_usd = {ph}, saved_usd = {ph} WHERE api_key = {ph}", (user["reqs"] + 1, new_spend, new_saved, user["token"]))
+    conn.commit()
+    cur.close()
+    conn.close()
+    return {"status": "success", "coding_cost_cut": pct_cut, "saved_this_call_usd": saved_call, "total_saved_usd": new_saved, "model": used_model, "cached": cached, "latency_ms": lat, "response": ans}
