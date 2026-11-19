@@ -1,1 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OptiMax Quantum | Neural AI Gateway</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:sans-serif;background:#030712;color:#f1f5f9;display:flex;min-height:100vh}
+.side{width:240px;background:#0a0f1c;border-right:1px solid #1e293b;padding:20px;display:flex;flex-direction:column;justify-content:space-between}
+.logo{font-weight:800;font-size:18px;color:#00f5d4;padding-bottom:15px;border-bottom:1px solid #1e293b}
+.nav{margin-top:15px;display:flex;flex-direction:column;gap:8px}
+.nav button{background:none;border:none;color:#94a3b8;padding:10px;border-radius:8px;text-align:left;font-size:14px;cursor:pointer}
+.nav button.active,.nav button:hover{background:#1e293b;color:#38bdf8}
+.main{flex:1;padding:24px;max-width:1000px;margin:0 auto;width:100%}
+.hero{background:linear-gradient(135deg,#0f172a,#064e3b);border:1px solid #00f5d4;border-radius:12px;padding:20px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px}
+.pct{background:#00f5d4;color:#022c22;font-weight:900;padding:3px 10px;border-radius:20px;font-size:12px}
+.panel{display:none;background:#0f172a;border:1px solid #1e293b;border-radius:12px;padding:20px}.panel.active{display:block}
+input,select,textarea{width:100%;padding:10px;border-radius:8px;border:1px solid #334155;background:#030712;color:#fff;margin:6px 0 12px}
+.btn{background:#0284c7;color:#fff;border:none;padding:10px 18px;border-radius:8px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-block}
+.cta{background:#00f5d4;color:#022c22}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:20px}
+.card{background:#0f172a;border:1px solid #1e293b;padding:16px;border-radius:10px}
+pre{background:#020617;border:1px solid #1e293b;padding:14px;border-radius:8px;color:#00f5d4;white-space:pre-wrap;min-height:80px}
+@media(max-width:768px){body{flex-direction:column}.side{width:100%}.nav{flex-direction:row}.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="side">
+  <div>
+    <div class="logo">⚡ OPTIMAX QUANTUM</div>
+    <div class="nav">
+      <button id="b-test" class="active" onclick="tab('test',this)">Neural Playground</button>
+      <button id="b-models" onclick="tab('models',this)">Model Search</button>
+      <button id="b-keys" onclick="tab('keys',this)">14-Day Trial Key</button>
+    </div>
+  </div>
+  <a href="/upgrade?plan=pro" class="btn cta" style="text-align:center">Upgrade Pro ($49)</a>
+</div>
+<div class="main">
+  <div class="hero">
+    <div><h2 style="margin:0 0 6px">Cut AI & Coding Costs <span class="pct">SAVE UP TO 74.3%</span></h2>
+    <p style="margin:0;color:#cbd5e1;font-size:13.5px">Auto complexity downgrading + PII masking + semantic caching.</p></div>
+    <button class="btn cta" onclick="tab('keys',document.getElementById('b-keys'))">Get Started Free →</button>
+  </div>
+  <div id="test" class="panel active">
+    <h3 style="margin-top:0">Live Multi-LLM Playground</h3>
+    <input id="key" value="optx_free_trial_user" placeholder="Virtual API Key">
+    <select id="mod"><option value="auto">Auto-Route (Cut Costs 74.3%)</option><option value="google/gemini-2.5-flash">Google: Gemini 2.5 Flash</option><option value="meta-llama/llama-3.3-70b-instruct:free">Meta: Llama 3.3 70B (Free)</option></select>
+    <textarea id="prm" rows="3" placeholder="Enter a prompt..."></textarea>
+    <button onclick="runAI()" class="btn">Execute Neural Route →</button>
+    <pre id="out">// Quantum telemetry & AI response...</pre>
+  </div>
+  <div id="models" class="panel">
+    <h3 style="margin-top:0">Search Models</h3>
+    <input id="mSearch" oninput="filterM()" placeholder="Search models (e.g. Gemini, Llama, DeepSeek, Free)...">
+    <div id="mList"></div>
+  </div>
+  <div id="keys" class="panel">
+    <h3 style="margin-top:0">Get Your 14-Day Free Trial Key</h3>
+    <form action="/start-trial" method="post">
+      <input name="name" placeholder="Name or Company" required>
+      <input name="email" type="email" placeholder="Work Email" required>
+      <button type="submit" class="btn cta">Generate Trial Key →</button>
+    </form>
+  </div>
+  <div class="grid">
+    <div class="card"><b>Pro — $49/mo</b><p style="font-size:12px;color:#94a3b8">$500/mo API cap</p><a href="/upgrade?plan=pro" class="btn">Choose Pro ($49)</a></div>
+    <div class="card" style="border-color:#00f5d4"><b>Business Scale — $499/mo</b><p style="font-size:12px;color:#94a3b8">$5,000/mo API cap</p><a href="/upgrade?plan=scale" class="btn cta">Choose Scale ($499)</a></div>
+    <div class="card"><b>Enterprise — $15,000</b><p style="font-size:12px;color:#94a3b8">$100k cap + Custom SLA</p><a href="/upgrade?plan=enterprise" class="btn">Buy Enterprise ($15k)</a></div>
+  </div>
+</div>
+<script>
+function tab(id,b){document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));document.getElementById(id).classList.add('active');if(b)b.classList.add('active')}
+let ALL_M=[];fetch('/v1/models').then(r=>r.json()).then(d=>{ALL_M=d.data||[];filterM()});
+function filterM(){const q=(document.getElementById('mSearch').value||'').toLowerCase();document.getElementById('mList').innerHTML=ALL_M.filter(m=>m.name.toLowerCase().includes(q)||m.id.toLowerCase().includes(q)).map(m=>`<div style='padding:10px;border-bottom:1px solid #1e293b;display:flex;justify-content:space-between'><span><b>${m.name}</b> <small style='color:#94a3b8'>(${m.in_price})</small></span><button class='btn' style='padding:4px 10px;font-size:12px' onclick="pickM('${m.id}')">Test</button></div>`).join('')}
+function pickM(id){const s=document.getElementById('mod');s.add(new Option(id,id));s.value=id;tab('test',document.getElementById('b-test'))}
+async function runAI(){const o=document.getElementById('out');o.textContent='Routing...';const r=await fetch('/v1/route',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+document.getElementById('key').value.trim()},body:JSON.stringify({prompt:document.getElementById('prm').value,model:document.getElementById('mod').value})});o.textContent=JSON.stringify(await r.json(),null,2)}
+</script>
+</body>
+</html>
 
