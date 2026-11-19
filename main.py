@@ -15,7 +15,9 @@ app = FastAPI(title="OptiMax Proxy Admin | Cut AI Coding Costs by 74%")
 
 OPENAI_KEY = os.environ.get("OPENAI_API_KEY", "")
 GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "")
-LEMON_URL = os.environ.get("LEMON_CHECKOUT_URL", "https://lemonsqueezy.com")
+LEMON_PRO_URL = os.environ.get("LEMON_PRO_URL", "https://lemonsqueezy.com")
+LEMON_SCALE_URL = os.environ.get("LEMON_SCALE_URL", "https://lemonsqueezy.com")
+LEMON_ENT_URL = os.environ.get("LEMON_ENTERPRISE_URL", "https://lemonsqueezy.com")
 RAW_DB = os.environ.get("DATABASE_URL", "").strip().removeprefix("psql ").strip().strip("'\"")
 
 USE_PG = bool(RAW_DB.startswith("postgres") and psycopg2)
@@ -67,7 +69,7 @@ async def verify_user(authorization: Optional[str] = Header(None)):
         raise HTTPException(status_code=403, detail="Invalid Virtual Key.")
     alias, tier, created_str, reqs, spend, saved, budget = row
     if tier == "trial" and datetime.utcnow() > datetime.fromisoformat(created_str) + timedelta(days=14):
-        raise HTTPException(status_code=402, detail="14-day trial expired. Visit /upgrade.")
+        raise HTTPException(status_code=402, detail="14-day trial expired. Upgrade below.")
     if spend >= budget:
         raise HTTPException(status_code=402, detail=f"Max Budget Exceeded (${spend}/{budget}).")
     return {"token": token, "alias": alias, "tier": tier, "reqs": reqs, "spend": spend, "saved": saved, "budget": budget}
@@ -133,7 +135,7 @@ UI_A = (
     "<button id='btn-models' onclick=\"tab('models',this)\">🧠 Models & Endpoints</button>"
     "<button id='btn-spend' onclick=\"tab('spend',this)\">📊 Cost Savings & Spend</button>"
     "<button id='btn-docs' onclick=\"tab('docs',this)\">🔌 OpenAI SDK Drop-In</button>"
-    "</div></div><a href='/upgrade' class='btn up'>Upgrade Enterprise ($49)</a></div>"
+    "</div></div><a href='/upgrade?plan=pro' class='btn up'>Upgrade Pro ($49)</a></div>"
 )
 
 UI_B = (
@@ -166,7 +168,11 @@ UI_B = (
     "<div id='spend' class='panel'><h3 style='margin-top:0'>Real-Time Coding Cost Reduction & Budget Ledger</h3><div id='spendBars'></div></div>"
     "<div id='docs' class='panel'><h3 style='margin-top:0'>1-Line OpenAI SDK Drop-In</h3>"
     "<pre style='color:#93c5fd'>from openai import OpenAI\n\nclient = OpenAI(\n    api_key=\"optx_free_trial_user\",\n    base_url=\"https://onrender.com\"\n)</pre></div>"
-    "</div></div><script>"
+    "<div style='display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:18px'>"
+    "<div class='stat'><b>Pro Plan — $49/mo</b><p style='font-size:12px;color:#94a3b8'>$500/mo API cap • Auto-Routing</p><a href='/upgrade?plan=pro' class='btn'>Choose Pro ($49)</a></div>"
+    "<div class='stat' style='border-color:#2563eb'><b>Business Scale — $499/mo</b><p style='font-size:12px;color:#94a3b8'>$5,000/mo cap • Priority Failover</p><a href='/upgrade?plan=scale' class='btn'>Choose Scale ($499)</a></div>"
+    "<div class='stat' style='border-color:#10b981'><b>Enterprise — $15,000</b><p style='font-size:12px;color:#94a3b8'>$100k cap • Custom SLA & Dedicated</p><a href='/upgrade?plan=enterprise' class='btn' style='background:#059669'>Buy Enterprise ($15k)</a></div>"
+    "</div></div></div><script>"
     "const titles={test:'Test Key (Playground)',keys:'Get Started: Virtual Keys & Trial',models:'Models & Cost Savings',spend:'Usage, Savings & Spend',docs:'Developer SDK Integration'};"
     "function tab(id,b){document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));document.getElementById(id).classList.add('active');if(b)b.classList.add('active');document.getElementById('hdr').textContent=titles[id];loadStats()}"
     "async function loadStats(){try{const r=await fetch('/v1/admin/stats');const d=await r.json();document.getElementById('rCnt').textContent=d.total_reqs;document.getElementById('savCnt').textContent='$'+d.total_saved.toFixed(2);"
@@ -212,18 +218,22 @@ async def start_trial(name: str = Form(...), email: str = Form(...)):
     return HTMLResponse(content=f"<body style='background:#090d16;color:#fff;font-family:sans-serif;text-align:center;padding:60px'><h2 style='color:#10b981'>🎉 You're In! 14-Day Trial Key Active</h2><p>Copy Key: <b style='color:#38bdf8'>{key}</b></p><a href='/' style='color:#38bdf8'>← Return to OptiMax Proxy Console</a></body>")
 
 @app.get("/upgrade")
-async def upgrade():
-    return RedirectResponse(url=LEMON_URL, status_code=303)
+async def upgrade(plan: str = "pro"):
+    urls = {"pro": LEMON_PRO_URL, "scale": LEMON_SCALE_URL, "enterprise": LEMON_ENT_URL}
+    return RedirectResponse(url=urls.get(plan, LEMON_PRO_URL), status_code=303)
 
 @app.post("/webhook/lemonsqueezy")
 async def webhook(request: Request):
     data = await request.json()
     if data.get("meta", {}).get("event_name") in ["order_created", "subscription_created"]:
-        email = data.get("data", {}).get("attributes", {}).get("user_email")
+        attrs = data.get("data", {}).get("attributes", {})
+        email = attrs.get("user_email")
+        total_cents = attrs.get("total", 0)
         if email:
+            tier, budget = ("enterprise", 100000.0) if total_cents >= 1000000 else (("scale", 5000.0) if total_cents >= 40000 else ("pro", 500.0))
             conn, ph = get_db()
             cur = conn.cursor()
-            cur.execute(f"UPDATE litellm_keys SET tier = 'enterprise', max_budget_usd = 5000.0 WHERE email = {ph}", (email,))
+            cur.execute(f"UPDATE litellm_keys SET tier = {ph}, max_budget_usd = {ph} WHERE email = {ph}", (tier, budget, email))
             conn.commit()
             cur.close()
             conn.close()
@@ -241,21 +251,3 @@ async def route(req: PromptReq, user: dict = Depends(verify_user)):
     actual_cost = 0.0 if cached else round(raw_cost * 0.257, 6)
     saved_call = round(raw_cost - actual_cost, 6)
     pct_cut = "100.0%" if cached else "74.3%"
-    new_spend = round(user["spend"] + actual_cost, 6)
-    new_saved = round(user["saved"] + saved_call, 6)
-    conn, ph = get_db()
-    cur = conn.cursor()
-    cur.execute(f"UPDATE litellm_keys SET requests = {ph}, spend_usd = {ph}, saved_usd = {ph} WHERE api_key = {ph}", (user["reqs"] + 1, new_spend, new_saved, user["token"]))
-    conn.commit()
-    cur.close()
-    conn.close()
-    return {"status": "success", "coding_cost_cut": pct_cut, "saved_this_call_usd": saved_call, "total_saved_usd": new_saved, "model": used_model, "cached": cached, "latency_ms": lat, "response": ans}
-
-@app.post("/v1/chat/completions")
-async def openai_dropin(req: dict, user: dict = Depends(verify_user)):
-    msgs = req.get("messages", [])
-    prompt = msgs[-1].get("content", "") if msgs else ""
-    verdict = shield.inspect_payload(prompt)
-    if not verdict.get("safe", True):
-        raise HTTPException(status_code=400, detail=f"Blocked: {verdict.get('reason')}")
-    ans, used_model, _ = await route_ai(prompt, req.get("model", "auto"))
