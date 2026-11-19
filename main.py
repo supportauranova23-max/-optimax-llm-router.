@@ -1,6 +1,6 @@
-import time, os, json, httpx, sqlite3, hmac, hashlib, secrets
+import time, os, json, httpx, sqlite3, hashlib, secrets
 from datetime import datetime, timedelta
-from fastapi import FastAPI, HTTPException, Header, Depends, Request, Form
+from fastapi import FastAPI, HTTPException, Header, Depends, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel
 from typing import Optional, Dict
@@ -16,7 +16,6 @@ app = FastAPI(title="OptiMax Enterprise Console")
 OPENAI_KEY = os.environ.get("OPENAI_API_KEY", "")
 GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "")
 LEMON_URL = os.environ.get("LEMON_CHECKOUT_URL", "https://lemonsqueezy.com")
-LEMON_SECRET = os.environ.get("LEMON_WEBHOOK_SECRET", "")
 RAW_DB = os.environ.get("DATABASE_URL", "").strip().removeprefix("psql ").strip().strip("'\"")
 
 USE_PG = bool(RAW_DB.startswith("postgres") and psycopg2)
@@ -79,13 +78,13 @@ async def route_ai(prompt: str, pref: str):
                 url = f"https://googleapis.com{GEMINI_KEY}"
                 r = await http.post(url, json={"contents": [{"parts": [{"text": prompt}]}]})
                 r.raise_for_status()
-                ans = r.json()["candidates"]["content"]["parts"]["text"]
+                ans = r.json()["candidates"][0]["content"]["parts"][0]["text"]
                 CACHE[c_key] = ans
                 return ans, "gemini-2.5-flash", False
             if prov == "openai" and OPENAI_KEY:
                 r = await http.post("https://openai.com", headers={"Authorization": f"Bearer {OPENAI_KEY}"}, json={"model": "gpt-4o-mini", "messages": [{"role": "user", "content": prompt}]})
                 r.raise_for_status()
-                ans = r.json()["choices"]["message"]["content"]
+                ans = r.json()["choices"][0]["message"]["content"]
                 CACHE[c_key] = ans
                 return ans, "gpt-4o-mini", False
         except Exception as e:
@@ -102,8 +101,6 @@ APP_HTML = (
     ".nav button{background:none;border:none;color:#9ca3af;padding:10px;border-radius:8px;text-align:left;font-size:14px;cursor:pointer}"
     ".nav button.active,.nav button:hover{background:#1f2937;color:#fff}"
     ".main{flex:1;padding:24px;max-width:950px;margin:0 auto;width:100%}"
-    ".kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px}"
-    ".kpi{background:#111827;border:1px solid #1f2937;padding:14px;border-radius:10px}"
     ".panel{display:none;background:#111827;border:1px solid #1f2937;border-radius:12px;padding:20px}.panel.active{display:block}"
     "input,select,textarea{width:100%;padding:10px;border-radius:8px;border:1px solid #374151;background:#0b0f17;color:#fff;margin:6px 0 12px}"
     ".btn{background:#2563eb;color:#fff;border:none;padding:10px 18px;border-radius:8px;font-weight:600;cursor:pointer;text-decoration:none;display:inline-block}"
@@ -116,11 +113,7 @@ APP_HTML = (
     "<button onclick=\"tab('keys',this)\">Trial Keys</button>"
     "<button onclick=\"tab('sdk',this)\">SDK Setup</button>"
     "</div></div><a href='/upgrade' class='btn green'>Upgrade ($49)</a></div>"
-    "<div class='main'><div class='kpis'>"
-    "<div class='kpi'><small style='color:#9ca3af'>Models</small><div style='font-weight:700;margin-top:4px'>Gemini / GPT-4o</div></div>"
-    "<div class='kpi'><small style='color:#9ca3af'>Cache</small><div style='font-weight:700;color:#10b981;margin-top:4px'>Semantic Active</div></div>"
-    "<div class='kpi'><small style='color:#9ca3af'>Security</small><div style='font-weight:700;color:#60a5fa;margin-top:4px'>CogniShield</div></div>"
-    "</div>"
+    "<div class='main'>"
     "<div id='play' class='panel active'><h3 style='margin-top:0'>Live Model Playground</h3>"
     "<input id='key' value='optx_free_trial_user'><select id='mod'><option value='auto'>Auto Route</option><option value='gemini'>Gemini 2.5 Flash</option><option value='openai'>GPT-4o Mini</option></select>"
     "<textarea id='prm' rows='3' placeholder='Ask anything...'></textarea>"
@@ -147,7 +140,7 @@ async def start_trial(name: str = Form(...), email: str = Form(...)):
     cur.execute(f"SELECT api_key FROM users WHERE email = {ph}", (email,))
     row = cur.fetchone()
     if row:
-        key = row
+        key = row[0]
     else:
         key = f"optx_trial_{secrets.token_hex(8)}"
         cur.execute(f"INSERT INTO users VALUES ({ph},{ph},{ph},{ph},{ph},{ph},{ph})", (key, name, email, "trial", datetime.utcnow().isoformat(), 0, 0.0))
@@ -158,3 +151,21 @@ async def start_trial(name: str = Form(...), email: str = Form(...)):
 
 @app.get("/upgrade")
 async def upgrade():
+    return RedirectResponse(url=LEMON_URL, status_code=303)
+
+@app.post("/v1/route")
+async def route(req: PromptReq, user: dict = Depends(verify_user)):
+    t0 = time.perf_counter()
+    verdict = shield.inspect_payload(req.prompt)
+    if not verdict.get("safe", True):
+        raise HTTPException(status_code=400, detail=f"Blocked: {verdict.get('reason')}")
+    ans, used_model, cached = await route_ai(req.prompt, req.model)
+    lat = round((time.perf_counter() - t0) * 1000, 2)
+    saved = round(user["saved"] + 0.015, 4)
+    conn, ph = get_db()
+    cur = conn.cursor()
+    cur.execute(f"UPDATE users SET usage_count = {ph}, saved_usd = {ph} WHERE api_key = {ph}", (user["usage"] + 1, saved, user["token"]))
+    conn.commit()
+    cur.close()
+    conn.close()
+    return {"status": "success", "model": used_model, "cached": cached, "latency_ms": lat, "total_saved_usd": saved, "response": ans}
