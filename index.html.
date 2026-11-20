@@ -2,234 +2,119 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>OptiMax Quantum | Neural & Edge AI Gateway</title>
+<title>OptiMax Quantum | AI & Edge Gateway</title>
 <style>
 *{box-sizing:border-box}
-body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#030712;color:#f1f5f9;display:flex;min-height:100vh;position:relative}
-.glow-bg,.glow-bg::before,.glow-bg::after,.glass-overlay,.grid-bg{position:fixed;inset:0;background:radial-gradient(circle at 15% 15%,rgba(56,189,248,0.12),transparent 40%),radial-gradient(circle at 85% 80%,rgba(0,245,212,0.1),transparent 40%);pointer-events:none !important;z-index:0}
+body{margin:0;font-family:sans-serif;background:#030712;color:#f1f5f9;display:flex;min-height:100vh;position:relative}
+.glow-bg{position:fixed;inset:0;background:radial-gradient(circle at 15% 15%,rgba(56,189,248,0.12),transparent 40%);pointer-events:none !important;z-index:0}
 .side,.main,.modal{position:relative;z-index:5}
-button,.btn,.pre-btn,.nav button,.switcher button,a{position:relative;z-index:10;cursor:pointer !important}
-.side{width:235px;background:#0a0f1c;border-right:1px solid #1e293b;padding:18px 12px;display:flex;flex-direction:column;justify-content:space-between}
-.logo{font-weight:800;font-size:16px;color:#00f5d4;padding-bottom:14px;border-bottom:1px solid #1e293b}
-.nav{margin-top:14px;display:flex;flex-direction:column;gap:5px}
-.nav button{background:none;border:none;color:#94a3b8;padding:10px 12px;border-radius:8px;text-align:left;font-size:13.5px;font-weight:600}
+button,.btn,.pre,.nav button,.sw button,a{position:relative;z-index:10;cursor:pointer !important}
+.side{width:230px;background:#0a0f1c;border-right:1px solid #1e293b;padding:18px 12px;display:flex;flex-direction:column;justify-content:space-between}
+.nav button{display:block;width:100%;background:none;border:none;color:#94a3b8;padding:10px;border-radius:8px;text-align:left;font-size:13.5px;font-weight:600;margin-top:4px}
 .nav button.active,.nav button:hover{background:#1e293b;color:#38bdf8}
-.main{flex:1;padding:20px;max-width:1080px;margin:0 auto;width:100%}
-.topbar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;background:#0a0f1c;border:1px solid #1e293b;padding:10px 16px;border-radius:10px;margin-bottom:16px}
-.switcher{display:inline-flex;background:#030712;border:1px solid #334155;border-radius:20px;padding:3px}
-.switcher button{background:none;border:none;color:#94a3b8;padding:6px 14px;border-radius:16px;font-size:12.5px;font-weight:700}
-.switcher button.active{background:linear-gradient(90deg,#00f5d4,#0284c7);color:#022c22}
-.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
-.kpi{background:#0f172a;border:1px solid #1e293b;padding:14px;border-radius:10px}
-.kpi small{color:#94a3b8;font-size:11px;text-transform:uppercase}.kpi div{font-size:20px;font-weight:800;margin-top:4px;color:#00f5d4}
+.main{flex:1;padding:20px;max-width:1050px;margin:0 auto;width:100%}
+.bar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;background:#0a0f1c;border:1px solid #1e293b;padding:10px 14px;border-radius:10px;margin-bottom:16px}
+.sw button{background:#030712;border:1px solid #334155;color:#94a3b8;padding:6px 12px;border-radius:16px;font-size:12px;font-weight:700}
+.sw button.active{background:#00f5d4;color:#022c22;border-color:#00f5d4}
+.kpis,.presets{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+.kpi,.pre{background:#0f172a;border:1px solid #1e293b;padding:12px;border-radius:10px}
+.pre{text-align:left;color:#cbd5e1;font-size:12px}.pre.active{border-color:#00f5d4;background:rgba(0,245,212,0.1);color:#fff}
 .panel{display:none;background:#0f172a;border:1px solid #1e293b;border-radius:12px;padding:18px}.panel.active{display:block}
-.presets{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
-.pre-btn{background:#030712;border:1px solid #334155;color:#cbd5e1;padding:10px;border-radius:8px;text-align:left;font-size:12px}
-.pre-btn.active{border-color:#00f5d4;background:rgba(0,245,212,0.12);color:#fff}
-input,textarea{width:100%;padding:10px;border-radius:8px;border:1px solid #334155;background:#030712;color:#fff;margin:6px 0 10px;font-size:13px;position:relative;z-index:10}
+input,textarea{width:100%;padding:10px;border-radius:8px;border:1px solid #334155;background:#030712;color:#fff;margin:6px 0 10px;font-size:13px}
 .btn{background:#0284c7;color:#fff;border:none;padding:9px 15px;border-radius:8px;font-weight:700;text-decoration:none;display:inline-block;font-size:12.5px}
-.cta{background:linear-gradient(90deg,#00f5d4,#10b981);color:#022c22;font-weight:800}
+.cta{background:#00f5d4;color:#022c22;font-weight:800}
 pre{background:#020617;border:1px solid #1e293b;padding:12px;border-radius:8px;color:#00f5d4;white-space:pre-wrap;font-size:12px;margin:8px 0}
-.modal{display:none;position:fixed;inset:0;background:rgba(2,6,23,0.85);align-items:center;justify-content:center;z-index:50;padding:16px}
-.modal-box{background:#0f172a;border:1px solid #00f5d4;border-radius:14px;padding:24px;max-width:440px;width:100%;text-align:center}
-@media(max-width:768px){body{flex-direction:column}.side{width:100%}.nav{flex-direction:row;overflow-x:auto}.kpis,.presets{grid-template-columns:1fr}}
+.modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);align-items:center;justify-content:center;z-index:50;padding:16px}
+.mbox{background:#0f172a;border:1px solid #00f5d4;border-radius:12px;padding:22px;max-width:420px;width:100%;text-align:center}
+@media(max-width:768px){body{flex-direction:column}.side{width:100%}.nav{display:flex;overflow-x:auto}.kpis,.presets{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
 <div class="glow-bg"></div>
 <div class="side">
   <div>
-    <div class="logo">⚡ OPTIMAX QUANTUM</div>
+    <b style="color:#00f5d4;font-size:16px">⚡ OPTIMAX QUANTUM</b>
     <div class="nav">
-      <button data-action="tab" data-target="play" class="active">⚡ Neural Playground</button>
-      <button data-action="tab" data-target="ide">🔌 Connect IDE</button>
-      <button data-action="tab" data-target="iot">📡 Edge & IoT Fleet</button>
-      <button data-action="tab" data-target="logs">📊 Route Trace Log</button>
-      <button data-action="tab" data-target="keys">🔑 14-Day Trial Key</button>
+      <button data-act="tab" data-t="play" class="active">⚡ Neural Playground</button>
+      <button data-act="tab" data-t="ide">🔌 Connect IDE</button>
+      <button data-act="tab" data-t="iot">📡 Edge & IoT Fleet</button>
+      <button data-act="tab" data-t="logs">📊 Route Trace Log</button>
+      <button data-act="tab" data-t="keys">🔑 14-Day Trial Key</button>
     </div>
   </div>
   <a href="/upgrade" target="_blank" class="btn cta" style="text-align:center">Upgrade Enterprise</a>
 </div>
 <div class="main">
-  <div class="topbar">
+  <div class="bar">
     <span style="color:#00f5d4;font-size:12px;font-weight:700">🛡️ Zero-Data-Retention: ACTIVE</span>
-    <div class="switcher">
-      <button id="sw-me" data-action="role" data-role="me" class="active">Personal View</button>
-      <button id="sw-org" data-action="role" data-role="org">Team Admin</button>
+    <div class="sw">
+      <button id="sw-me" data-act="role" data-r="me" class="active">Personal View</button>
+      <button id="sw-org" data-act="role" data-r="org">Team Admin</button>
     </div>
-    <input id="key" value="optx_free_trial_user" style="width:210px;margin:0;padding:6px 10px;font-size:12px" placeholder="API Key">
+    <input id="key" value="optx_free_trial_user" style="width:200px;margin:0;padding:6px 10px;font-size:12px">
   </div>
   <div class="kpis">
-    <div class="kpi"><small id="k1-lbl">Personal Savings</small><div id="k1-val">$0.00</div></div>
-    <div class="kpi"><small id="k2-lbl">Tokens Routed</small><div id="k2-val" style="color:#38bdf8">0</div></div>
-    <div class="kpi"><small id="k3-lbl">PII Masked</small><div id="k3-val" style="color:#fff">0</div></div>
+    <div class="kpi"><small id="l1">Personal Savings</small><div id="v1" style="font-size:20px;font-weight:800;color:#00f5d4">$0.00</div></div>
+    <div class="kpi"><small id="l2">Tokens Routed</small><div id="v2" style="font-size:20px;font-weight:800;color:#38bdf8">0</div></div>
+    <div class="kpi"><small id="l3">PII Masked</small><div id="v3" style="font-size:20px;font-weight:800">0</div></div>
   </div>
-
   <div id="play" class="panel active">
     <div class="presets">
-      <button data-action="preset" data-preset="max_savings" class="pre-btn active"><b>💰 Max Savings (74% Off)</b><br><small style="color:#94a3b8">Gemini Flash / Mini for code</small></button>
-      <button data-action="preset" data-preset="balanced" class="pre-btn"><b>⚖️ Balanced Quality</b><br><small style="color:#94a3b8">Frontier plan + fast execution</small></button>
-      <button data-action="preset" data-preset="strict_privacy" class="pre-btn"><b>🔒 Strict Privacy</b><br><small style="color:#94a3b8">Zero-retention + PII redaction</small></button>
+      <button data-act="mode" data-m="max_savings" class="pre active"><b>💰 Max Savings (74% Off)</b><br><small>Fast low-cost models</small></button>
+      <button data-act="mode" data-m="balanced" class="pre"><b>⚖️ Balanced Quality</b><br><small>Frontier plan + fast exec</small></button>
+      <button data-act="mode" data-m="strict_privacy" class="pre"><b>🔒 Strict Privacy</b><br><small>Zero-retention + PII mask</small></button>
     </div>
-    <textarea id="prm" rows="3" placeholder="Paste code or prompt (Zero prompt logging enforced)..."></textarea>
-    <button data-action="run-route" class="btn">Execute Neural Route →</button>
-    <pre id="out">// Metadata telemetry & response...</pre>
+    <textarea id="prm" rows="3" placeholder="Enter code or prompt..."></textarea>
+    <button data-act="route" class="btn">Execute Neural Route →</button>
+    <pre id="out">// Ready...</pre>
   </div>
   <div id="ide" class="panel">
-    <h3 style="margin-top:0">🔌 1-Click Connect IDE Config Generator</h3>
+    <h3 style="margin-top:0">🔌 Connect IDE</h3>
     <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
-      <button data-action="ide" data-ide="cursor" class="btn">Cursor</button>
-      <button data-action="ide" data-ide="cline" class="btn">Cline (VS Code)</button>
-      <button data-action="ide" data-ide="windsurf" class="btn">Windsurf</button>
-      <button data-action="ide" data-ide="python" class="btn">Python SDK</button>
+      <button data-act="ide" data-i="cursor" class="btn">Cursor</button>
+      <button data-act="ide" data-i="cline" class="btn">Cline</button>
+      <button data-act="ide" data-i="windsurf" class="btn">Windsurf</button>
+      <button data-act="ide" data-i="python" class="btn">Python SDK</button>
     </div>
     <pre id="ideBox" style="color:#38bdf8"></pre>
-    <button data-action="copy-ide" class="btn cta">📋 Copy Config</button>
+    <button data-act="copy-ide" class="btn cta">📋 Copy Config</button>
   </div>
   <div id="iot" class="panel">
-    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-      <h3 style="margin:0">📡 Edge & IoT Lightweight Gateway (<code>/v1/edge/chat</code>)</h3>
-      <button data-action="gen-iot" class="btn cta">+ Generate IoT Device Key</button>
-    </div>
-    <pre id="iotKeyBox" style="color:#38bdf8">// Click "+ Generate IoT Device Key" or test with key: optx_live_prod_99x1</pre>
+    <h3 style="margin-top:0">📡 Edge & IoT Fleet</h3>
+    <button data-act="iot" class="btn cta">+ Generate IoT Device Key</button>
+    <pre id="iotBox" style="color:#38bdf8">// Demo fleet key: optx_live_prod_99x1</pre>
   </div>
-  <div id="logs" class="panel">
-    <h3 style="margin-top:0">📊 Live Zero-Payload Route Trace Log</h3>
-    <div id="logFeed" style="font-size:13px">No traces yet.</div>
-  </div>
+  <div id="logs" class="panel"><h3 style="margin-top:0">📊 Route Trace Log</h3><div id="logBox">No traces yet.</div></div>
   <div id="keys" class="panel">
-    <h3 style="margin-top:0">🔑 14-Day Free Trial Key</h3>
-    <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
-      <input id="trialDisplay" value="optx_free_trial_user" readonly style="margin:0">
-      <button data-action="copy-trial" class="btn">📋 Copy Key</button>
+    <h3 style="margin-top:0">🔑 14-Day Trial Key</h3>
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <input id="trialBox" value="optx_free_trial_user" readonly style="margin:0">
+      <button data-act="copy-key" class="btn">📋 Copy Key</button>
     </div>
     <form action="/start-trial" method="post">
-      <input name="name" placeholder="Developer or Team Name" required>
+      <input name="name" placeholder="Name or Team" required>
       <input name="email" type="email" placeholder="Work Email" required>
-      <button type="submit" class="btn cta">Generate New 14-Day Trial Key →</button>
+      <button type="submit" class="btn cta">Generate New Trial Key →</button>
     </form>
   </div>
 </div>
-<div id="upModal" class="modal">
-  <div class="modal-box">
-    <h3 style="margin-top:0;color:#00f5d4">🔒 Unlock Team Admin & IoT Fleet View</h3>
-    <p style="font-size:13px;color:#cbd5e1">Your current key is on a <b>Personal / Trial</b> tier. Upgrade via Lemon Squeezy to unlock the <b>Team Admin</b> dashboard.</p>
-    <div style="display:flex;gap:10px;justify-content:center;margin-top:16px">
-      <a href="/upgrade" target="_blank" class="btn cta">Upgrade via Lemon Squeezy →</a>
-      <button data-action="close-modal" class="btn" style="background:#1e293b">Close</button>
-    </div>
-  </div>
-</div>
+<div id="upModal" class="modal"><div class="mbox">
+  <h3 style="color:#00f5d4;margin-top:0">🔒 Team Admin Locked</h3>
+  <p style="font-size:13px">Upgrade via Lemon Squeezy to unlock Team Admin & IoT Fleet view.</p>
+  <a href="/upgrade" target="_blank" class="btn cta">Upgrade Now →</a>
+  <button data-act="close" class="btn" style="background:#334155">Close</button>
+</div></div>
 <script>
-document.addEventListener('DOMContentLoaded', () => {
-  let ROLE = 'me', PRESET = 'max_savings', CUR_IDE = 'cursor';
-  const getKey = () => { const el = document.getElementById('key'); return el ? el.value.trim() : 'optx_free_trial_user'; };
-
-  function renderIDE() {
-    const box = document.getElementById('ideBox');
-    if (!box) return;
-    const k = getKey() || 'optx_free_trial_user';
-    const u = 'https://onrender.com';
-    const cfg = {
-      cursor: `{\n  "openai.apiKey": "${k}",\n  "openai.baseUrl": "${u}"\n}`,
-      cline: `{\n  "apiProvider": "openai",\n  "openAiBaseUrl": "${u}",\n  "openAiApiKey": "${k}"\n}`,
-      windsurf: `{\n  "windsurf.customApiUrl": "${u}",\n  "windsurf.apiKey": "${k}"\n}`,
-      python: `from openai import OpenAI\n\nclient = OpenAI(\n    api_key="${k}",\n    base_url="${u}"\n)`
-    };
-    box.textContent = cfg[CUR_IDE] || cfg.cursor;
-  }
-
-  async function switchRole(r) {
-    try {
-      const res = await fetch(r === 'org' ? '/api/dashboard/org' : '/api/dashboard/me', {
-        headers: { 'Authorization': 'Bearer ' + getKey() }
-      });
-      const d = await res.json();
-      if (res.status === 403 && d.upgrade_required) {
-        const m = document.getElementById('upModal');
-        if (m) m.style.display = 'flex';
-        return;
-      }
-      ROLE = r;
-      const swMe = document.getElementById('sw-me'), swOrg = document.getElementById('sw-org');
-      if (swMe) swMe.classList.toggle('active', r === 'me');
-      if (swOrg) swOrg.classList.toggle('active', r === 'org');
-      const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
-      setTxt('k1-lbl', r === 'me' ? 'Personal Savings' : 'Org Savings');
-      setTxt('k1-val', '$' + (r === 'me' ? (d.saved_usd || 0) : (d.org_saved_usd || 0)));
-      setTxt('k2-lbl', r === 'me' ? 'Tokens Routed' : 'Active IoT Devices');
-      setTxt('k2-val', r === 'me' ? (d.tokens_routed || 0) : (d.active_iot_devices || 0));
-      setTxt('k3-lbl', r === 'me' ? 'PII Masked' : 'Rogue Loops Blocked');
-      setTxt('k3-val', r === 'me' ? (d.pii_masked || 0) : (d.rogue_loops_blocked || 0));
-      const feed = document.getElementById('logFeed');
-      if (feed) feed.innerHTML = (d.logs || []).map(l => `<div style='padding:8px;border-bottom:1px solid #1e293b'><b>[${l.device_id}]</b> ${l.model} • ${l.tokens} tok • ${l.latency}ms • <span style='color:#00f5d4'>Saved $${l.saved}</span></div>`).join('') || 'No traces yet.';
-    } catch (e) { console.error('[OptiMax] Role Error:', e); }
-  }
-
-  document.addEventListener('click', async (e) => {
-    const btn = e.target.closest('[data-action]');
-    if (!btn) return;
-    const act = btn.dataset.action;
-    console.log('[OptiMax Click Fired]:', act, btn.dataset);
-
-    if (act === 'tab') {
-      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-      document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active'));
-      const target = document.getElementById(btn.dataset.target);
-      if (target) target.classList.add('active');
-      btn.classList.add('active');
-    } else if (act === 'preset') {
-      PRESET = btn.dataset.preset;
-      document.querySelectorAll('.pre-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-    } else if (act === 'ide') {
-      CUR_IDE = btn.dataset.ide;
-      renderIDE();
-    } else if (act === 'copy-ide') {
-      const box = document.getElementById('ideBox');
-      if (box) navigator.clipboard.writeText(box.textContent);
-      btn.textContent = '✓ Copied!';
-      setTimeout(() => btn.textContent = '📋 Copy Config', 1500);
-    } else if (act === 'copy-trial') {
-      const td = document.getElementById('trialDisplay');
-      if (td) navigator.clipboard.writeText(td.value);
-      btn.textContent = '✓ Copied!';
-      setTimeout(() => btn.textContent = '📋 Copy Key', 1500);
-    } else if (act === 'role') {
-      await switchRole(btn.dataset.role);
-    } else if (act === 'close-modal') {
-      const m = document.getElementById('upModal');
-      if (m) m.style.display = 'none';
-    } else if (act === 'gen-iot') {
-      const box = document.getElementById('iotKeyBox');
-      if (box) box.textContent = 'Generating IoT Fleet Key...';
-      const r = await fetch('/api/keys/iot', { method: 'POST', headers: { 'Authorization': 'Bearer ' + getKey() } });
-      const d = await r.json();
-      if (box) box.textContent = r.ok ? ('New IoT Key: ' + d.api_key) : JSON.stringify(d);
-    } else if (act === 'run-route') {
-      const out = document.getElementById('out'), prm = document.getElementById('prm');
-      if (out) out.textContent = 'Routing (' + PRESET + ')...';
-      const r = await fetch('/v1/route', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getKey() },
-        body: JSON.stringify({ prompt: prm ? prm.value : '', preset: PRESET })
-      });
-      const d = await r.json();
-      if (out) out.textContent = JSON.stringify(d, null, 2);
-      await switchRole(ROLE);
-    }
-  });
-
-  const keyEl = document.getElementById('key');
-  if (keyEl) keyEl.addEventListener('input', () => {
-    const td = document.getElementById('trialDisplay');
-    if (td) td.value = getKey();
-    renderIDE();
-  });
-
-  renderIDE();
-  switchRole('me');
-});
-</script>
-</body>
-</html>
+document.addEventListener('DOMContentLoaded',()=>{
+  let ROLE='me',MODE='max_savings',IDE='cursor';
+  const kVal=()=>document.getElementById('key')?.value.trim()||'optx_free_trial_user';
+  function showIDE(t){IDE=t;const k=kVal(),u='https://onrender.com c={cursor:`{\n  "openai.apiKey": "${k}",\n  "openai.baseUrl": "${u}"\n}`,cline:`{\n  "apiProvider": "openai",\n  "openAiBaseUrl": "${u}",\n  "openAiApiKey": "${k}"\n}`,windsurf:`{\n  "windsurf.customApiUrl": "${u}",\n  "windsurf.apiKey": "${k}"\n}`,python:`from openai import OpenAI\nclient = OpenAI(api_key="${k}", base_url="${u}")`};const b=document.getElementById('ideBox');if(b)b.textContent=c[IDE]}
+  async function setRole(r){try{const res=await fetch(r==='org'?'/api/dashboard/org':'/api/dashboard/me',{headers:{'Authorization':'Bearer '+kVal()}});const d=await res.json();if(res.status===403&&d.upgrade_required){const m=document.getElementById('upModal');if(m)m.style.display='flex';return}ROLE=r;document.getElementById('sw-me')?.classList.toggle('active',r==='me');document.getElementById('sw-org')?.classList.toggle('active',r==='org');document.getElementById('l1').textContent=r==='me'?'Personal Savings':'Org Savings';document.getElementById('v1').textContent='$'+(r==='me'?(d.saved_usd||0):(d.org_saved_usd||0));document.getElementById('l2').textContent=r==='me'?'Tokens Routed':'Active IoT Devices';document.getElementById('v2').textContent=r==='me'?(d.tokens_routed||0):(d.active_iot_devices||0);document.getElementById('l3').textContent=r==='me'?'PII Masked':'Loops Blocked';document.getElementById('v3').textContent=r==='me'?(d.pii_masked||0):(d.rogue_loops_blocked||0);const lb=document.getElementById('logBox');if(lb)lb.innerHTML=(d.logs||[]).map(l=>`<div style="padding:6px;border-bottom:1px solid #1e293b">[${l.device_id}] ${l.model} • Saved $${l.saved}</div>`).join('')||'No traces yet.'}catch(e){}}
+  document.addEventListener('click',async(e)=>{
+    const b=e.target.closest('[data-act]');if(!b)return;const a=b.dataset.act;
+    if(a==='tab'){document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));document.getElementById(b.dataset.t)?.classList.add('active');b.classList.add('active')}
+    else if(a==='mode'){MODE=b.dataset.m;document.querySelectorAll('.pre').forEach(x=>x.classList.remove('active'));b.classList.add('active')}
+    else if(a==='ide')showIDE(b.dataset.i);
+    else if(a==='copy-ide'){navigator.clipboard.writeText(document.getElementById('ideBox')?.textContent||'');b.textContent='✓ Copied!';setTimeout(()=>b.textContent='📋 Copy Config',1500)}
+    else if(a==='copy-key'){navigator.clipboard.writeText(document.getElementById('trialBox')?.value||'');b.textContent='✓ Copied!';setTimeout(()=>b.textContent='📋 Copy Key',1500)}
+    else if(a==='role')await setRole(b.dataset.r);
