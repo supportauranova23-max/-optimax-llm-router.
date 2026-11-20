@@ -35,9 +35,7 @@ def get_db():
 def init_db():
     conn, ph = get_db()
     cur = conn.cursor()
-    # Original Lemon Squeezy / LiteLLM subscription table preserved intact
     cur.execute("CREATE TABLE IF NOT EXISTS litellm_keys (api_key TEXT PRIMARY KEY, key_alias TEXT, email TEXT, tier TEXT, created_at TEXT, requests INTEGER DEFAULT 0, spend_usd REAL DEFAULT 0.0, saved_usd REAL DEFAULT 0.0, max_budget_usd REAL DEFAULT 25.0)")
-    # Additive metadata-only table for IDE & IoT Edge logs (zero prompt/completion bodies)
     cur.execute("CREATE TABLE IF NOT EXISTS edge_meta_logs (id TEXT PRIMARY KEY, api_key TEXT, device_id TEXT, reason TEXT, model TEXT, tokens INTEGER, latency_ms REAL, pii_count INTEGER, saved_usd REAL, cache_hit INTEGER DEFAULT 0)")
     now = datetime.utcnow().isoformat()
     starters = [
@@ -111,26 +109,22 @@ async def fast_llm_call(clean_p: str, max_tokens: int = 400):
     if GEMINI_KEY:
         r = await http.post(f"https://googleapis.com{GEMINI_KEY}", json={"contents": [{"parts": [{"text": clean_p}]}], "generationConfig": {"maxOutputTokens": max_tokens}})
         if r.status_code == 200:
-            return r.json()["candidates"]["content"]["parts"]["text"], "google/gemini-2.5-flash"
+            return r.json()["candidates"][0]["content"]["parts"][0]["text"], "google/gemini-2.5-flash"
     if OPENAI_KEY:
         r = await http.post("https://openai.com", headers={"Authorization": f"Bearer {OPENAI_KEY}"}, json={"model": "gpt-4o-mini", "max_tokens": max_tokens, "messages": [{"role": "user", "content": clean_p}]})
         if r.status_code == 200:
-            return r.json()["choices"]["message"]["content"], "openai/gpt-4o-mini"
+            return r.json()["choices"][0]["message"]["content"], "openai/gpt-4o-mini"
     if OPENROUTER_KEY:
         r = await http.post("https://openrouter.ai", headers={"Authorization": f"Bearer {OPENROUTER_KEY}"}, json={"model": "meta-llama/llama-3.3-70b-instruct:free", "max_tokens": max_tokens, "messages": [{"role": "user", "content": clean_p}]})
         if r.status_code == 200:
-            return r.json()["choices"]["message"]["content"], "meta-llama/llama-3.3-70b:free"
+            return r.json()["choices"][0]["message"]["content"], "meta-llama/llama-3.3-70b:free"
     raise HTTPException(status_code=502, detail="Configure GEMINI_API_KEY, OPENAI_API_KEY, or OPENROUTER_API_KEY in Render.")
 
 @app.get("/", response_class=HTMLResponse)
 async def home():
-    for fname in os.listdir("."):
-        if fname.endswith(".html"):
-            with open(fname, "r", encoding="utf-8") as f:
-                return HTMLResponse(content=f.read())
-    return HTMLResponse(content="<h1>No .html file found</h1>")
+    with open("index.html", "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read())
 
-# Original Lemon Squeezy Checkout & Webhook preserved completely untouched
 @app.get("/upgrade")
 async def upgrade():
     return RedirectResponse(url=LEMON_URL, status_code=303)
@@ -149,7 +143,22 @@ async def webhook(request: Request):
             conn.close()
     return {"status": "ok"}
 
-# Unified Dashboard Endpoints (Reading existing subscription status from litellm_keys)
+@app.post("/start-trial", response_class=HTMLResponse)
+async def start_trial(name: str = Form(...), email: str = Form(...)):
+    conn, ph = get_db()
+    cur = conn.cursor()
+    cur.execute(f"SELECT api_key FROM litellm_keys WHERE email = {ph}", (email,))
+    row = cur.fetchone()
+    if row:
+        (key,) = row
+    else:
+        key = f"optx_trial_{secrets.token_hex(8)}"
+        cur.execute(f"INSERT INTO litellm_keys VALUES ({ph},{ph},{ph},{ph},{ph},{ph},{ph},{ph},{ph})", (key, name, email, "trial", datetime.utcnow().isoformat(), 0, 0.0, 0.0, 25.0))
+        conn.commit()
+    cur.close()
+    conn.close()
+    return HTMLResponse(content=f"<body style='background:#030712;color:#fff;font-family:sans-serif;text-align:center;padding:60px'><h2 style='color:#00f5d4'>14-Day Trial Key Ready!</h2><p>Copy Key: <b style='color:#38bdf8'>{key}</b></p><a href='/' style='color:#38bdf8'>← Back to Dashboard</a></body>")
+
 @app.get("/api/dashboard/me")
 async def dashboard_me(user: dict = Depends(verify_user)):
     conn, ph = get_db()
@@ -171,13 +180,3 @@ async def dashboard_org(user: dict = Depends(verify_user)):
     cur.execute("SELECT COALESCE(SUM(saved_usd),0) FROM litellm_keys")
     (org_saved,) = cur.fetchone()
     cur.execute("SELECT COUNT(DISTINCT device_id), COALESCE(AVG(cache_hit),0) FROM edge_meta_logs WHERE device_id IS NOT NULL")
-    dev_cnt, hit_rate = cur.fetchone()
-    cur.execute("SELECT device_id, model, tokens, latency_ms, saved_usd, cache_hit FROM edge_meta_logs ORDER BY rowid DESC LIMIT 10")
-    logs = [{"device_id": dev or "IDE", "model": mdl, "tokens": tk, "latency": lat, "saved": round(float(sv), 4), "cache_hit": bool(ch)} for dev, mdl, tk, lat, sv, ch in cur.fetchall()]
-    cur.close()
-    conn.close()
-
-@app.get("/ui.js")
-async def serve_ui_js():
-    with open("ui.js", "r", encoding="utf-8") as f:
-        return HTMLResponse(content=f.read(), media_type="application/javascript")
