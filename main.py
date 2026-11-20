@@ -1,17 +1,18 @@
 import time, os, re, json, asyncio, httpx, sqlite3, hashlib, secrets
 from datetime import datetime, timedelta
 from fastapi import FastAPI, HTTPException, Header, Depends, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from pydantic import BaseModel
 from typing import Optional, Dict
 from cognishield_layer import CogniShieldLayer
+from edge_gateway import check_device_rate_limit, get_edge_cache, set_edge_cache, ROGUE_LOOPS_BLOCKED
 
 try:
     import psycopg2
 except ImportError:
     psycopg2 = None
 
-app = FastAPI(title="OptiMax Quantum Enterprise Gateway")
+app = FastAPI(title="OptiMax Quantum Enterprise & Edge Gateway")
 
 OPENAI_KEY = os.environ.get("OPENAI_API_KEY", "")
 GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "")
@@ -23,11 +24,7 @@ RAW_DB = os.environ.get("DATABASE_URL", "").strip().removeprefix("psql ").strip(
 
 USE_PG = bool(RAW_DB.startswith("postgres") and psycopg2)
 shield = CogniShieldLayer()
-
-http = httpx.AsyncClient(
-    timeout=httpx.Timeout(25.0, connect=5.0),
-    limits=httpx.Limits(max_keepalive_connections=50, max_connections=200)
-)
+http = httpx.AsyncClient(timeout=httpx.Timeout(25.0, connect=5.0), limits=httpx.Limits(max_keepalive_connections=50, max_connections=200))
 CACHE: Dict[str, str] = {}
 
 def get_db():
@@ -36,16 +33,31 @@ def get_db():
             return psycopg2.connect(RAW_DB), "%s"
         except Exception:
             pass
-    return sqlite3.connect("optimax_zdr.db"), "?"
+    return sqlite3.connect("optimax_rbac_edge.db"), "?"
 
 def init_db():
     conn, ph = get_db()
     cur = conn.cursor()
-    cur.execute("CREATE TABLE IF NOT EXISTS zdr_keys (api_key TEXT PRIMARY KEY, name TEXT, email TEXT, tier TEXT, created_at TEXT, reqs INTEGER DEFAULT 0, saved_usd REAL DEFAULT 0.0, raw_usd REAL DEFAULT 0.0)")
-    cur.execute("CREATE TABLE IF NOT EXISTS zdr_traces (id TEXT PRIMARY KEY, reason TEXT, model TEXT, tokens INTEGER, latency_ms REAL, pii_count INTEGER, saved_usd REAL)")
-    sql = "INSERT INTO zdr_keys VALUES (%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (api_key) DO NOTHING" if ph == "%s" else "INSERT OR IGNORE INTO zdr_keys VALUES (?,?,?,?,?,?,?,?)"
-    day12_demo = (datetime.utcnow() - timedelta(days=12)).isoformat()
-    cur.execute(sql, ("optx_free_trial_user", "Sandbox IDE", "trial@user.com", "trial", day12_demo, 48, 118.40, 159.35))
+    cur.execute("CREATE TABLE IF NOT EXISTS workspaces (id TEXT PRIMARY KEY, name TEXT, plan_tier TEXT, lemon_squeezy_sub_id TEXT)")
+    cur.execute("CREATE TABLE IF NOT EXISTS workspace_members (workspace_id TEXT, user_id TEXT, role TEXT, PRIMARY KEY (workspace_id, user_id))")
+    cur.execute("CREATE TABLE IF NOT EXISTS api_keys (api_key TEXT PRIMARY KEY, workspace_id TEXT, user_id TEXT, key_type TEXT, rate_limit_rpm INTEGER DEFAULT 60, monthly_budget_limit REAL DEFAULT 500.0, current_spend REAL DEFAULT 0.0, created_at TEXT)")
+    # Zero-Payload Logging: Strictly metadata—no prompt or completion columns
+    cur.execute("CREATE TABLE IF NOT EXISTS request_logs (id TEXT PRIMARY KEY, workspace_id TEXT, user_id TEXT, device_id TEXT, reason TEXT, model TEXT, tokens INTEGER, latency_ms REAL, pii_count INTEGER, saved_usd REAL, cache_hit INTEGER DEFAULT 0)")
+    now = datetime.utcnow().isoformat()
+    if ph == "%s":
+        cur.execute("INSERT INTO workspaces VALUES (%s,%s,%s,%s) ON CONFLICT (id) DO NOTHING", ("ws_solo_01", "Solo Dev Workspace", "pro_49", ""))
+        cur.execute("INSERT INTO workspaces VALUES (%s,%s,%s,%s) ON CONFLICT (id) DO NOTHING", ("ws_team_99", "Acme Robotics Fleet", "team_499", "sub_ls_9981"))
+        cur.execute("INSERT INTO workspace_members VALUES (%s,%s,%s) ON CONFLICT DO NOTHING", ("ws_solo_01", "dev@solo.io", "owner"))
+        cur.execute("INSERT INTO workspace_members VALUES (%s,%s,%s) ON CONFLICT DO NOTHING", ("ws_team_99", "admin@acme.io", "owner"))
+        cur.execute("INSERT INTO api_keys VALUES (%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (api_key) DO NOTHING", ("optx_free_trial_user", "ws_solo_01", "dev@solo.io", "ide", 60, 500.0, 4.10, now))
+        cur.execute("INSERT INTO api_keys VALUES (%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (api_key) DO NOTHING", ("optx_team_iot_fleet_01", "ws_team_99", "admin@acme.io", "iot_fleet", 120, 5000.0, 18.50, now))
+    else:
+        cur.execute("INSERT OR IGNORE INTO workspaces VALUES (?,?,?,?)", ("ws_solo_01", "Solo Dev Workspace", "pro_49", ""))
+        cur.execute("INSERT OR IGNORE INTO workspaces VALUES (?,?,?,?)", ("ws_team_99", "Acme Robotics Fleet", "team_499", "sub_ls_9981"))
+        cur.execute("INSERT OR IGNORE INTO workspace_members VALUES (?,?,?)", ("ws_solo_01", "dev@solo.io", "owner"))
+        cur.execute("INSERT OR IGNORE INTO workspace_members VALUES (?,?,?)", ("ws_team_99", "admin@acme.io", "owner"))
+        cur.execute("INSERT OR IGNORE INTO api_keys VALUES (?,?,?,?,?,?,?,?)", ("optx_free_trial_user", "ws_solo_01", "dev@solo.io", "ide", 60, 500.0, 4.10, now))
+        cur.execute("INSERT OR IGNORE INTO api_keys VALUES (?,?,?,?,?,?,?,?)", ("optx_team_iot_fleet_01", "ws_team_99", "admin@acme.io", "iot_fleet", 120, 5000.0, 18.50, now))
     conn.commit()
     cur.close()
     conn.close()
@@ -55,7 +67,11 @@ init_db()
 class PromptReq(BaseModel):
     prompt: str
     preset: Optional[str] = "max_savings"
-    model: Optional[str] = "auto"
+
+class EdgeChatReq(BaseModel):
+    device_id: str
+    prompt: str
+    max_tokens: Optional[int] = 100
 
 def pii_redact(text: str):
     vault = {}
@@ -71,35 +87,56 @@ def pii_restore(text: str, vault: Dict[str, str]):
         text = text.replace(k, v)
     return text
 
-def _bg_write_metadata(token: str, reason: str, model: str, tokens: int, lat: float, pii_cnt: int, saved: float, raw: float):
+def _bg_log_meta(ws_id: str, uid: str, dev_id: Optional[str], reason: str, model: str, toks: int, lat: float, pii: int, saved: float, spend: float, cache_hit: bool, api_key: str):
     conn, ph = get_db()
     cur = conn.cursor()
-    cur.execute(f"UPDATE zdr_keys SET reqs = reqs + 1, saved_usd = saved_usd + {ph}, raw_usd = raw_usd + {ph} WHERE api_key = {ph}", (saved, raw, token))
-    cur.execute(f"INSERT INTO zdr_traces VALUES ({ph},{ph},{ph},{ph},{ph},{ph},{ph})", (secrets.token_hex(6), reason, model, tokens, lat, pii_cnt, saved))
+    cur.execute(f"UPDATE api_keys SET current_spend = current_spend + {ph} WHERE api_key = {ph}", (spend, api_key))
+    cur.execute(f"INSERT INTO request_logs VALUES ({ph},{ph},{ph},{ph},{ph},{ph},{ph},{ph},{ph},{ph},{ph})", (secrets.token_hex(6), ws_id, uid, dev_id, reason, model, toks, lat, pii, saved, 1 if cache_hit else 0))
     conn.commit()
     cur.close()
     conn.close()
 
-async def log_metadata_nonblocking(token: str, reason: str, model: str, tokens: int, lat: float, pii_cnt: int, saved: float, raw: float):
-    await asyncio.to_thread(_bg_write_metadata, token, reason, model, tokens, lat, pii_cnt, saved, raw)
+async def log_meta_async(ws_id: str, uid: str, dev_id: Optional[str], reason: str, model: str, toks: int, lat: float, pii: int, saved: float, spend: float, cache_hit: bool, api_key: str):
+    await asyncio.to_thread(_bg_log_meta, ws_id, uid, dev_id, reason, model, toks, lat, pii, saved, spend, cache_hit, api_key)
 
-async def verify_user(authorization: Optional[str] = Header(None)):
+async def get_auth_context(authorization: Optional[str] = Header(None)):
     if not authorization or not authorization.strip().startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing Bearer token.")
     token = authorization.strip().removeprefix("Bearer ").strip()
     conn, ph = get_db()
     cur = conn.cursor()
-    cur.execute(f"SELECT name, tier, created_at, saved_usd FROM zdr_keys WHERE api_key = {ph}", (token,))
+    cur.execute(f"""
+        SELECT k.workspace_id, k.user_id, k.key_type, k.rate_limit_rpm, k.monthly_budget_limit, k.current_spend,
+               w.name, w.plan_tier, COALESCE(m.role, 'developer')
+        FROM api_keys k
+        JOIN workspaces w ON k.workspace_id = w.id
+        LEFT JOIN workspace_members m ON m.workspace_id = k.workspace_id AND m.user_id = k.user_id
+        WHERE k.api_key = {ph}
+    """, (token,))
     row = cur.fetchone()
     cur.close()
     conn.close()
     if not row:
-        raise HTTPException(status_code=403, detail="Invalid Virtual Key.")
-    name, tier, created_str, saved = row
-    age_days = (datetime.utcnow() - datetime.fromisoformat(created_str)).days
-    if tier == "trial" and age_days > 14:
-        raise HTTPException(status_code=402, detail="14-day trial expired. Upgrade to $49/mo BYOK Pro.")
-    return {"token": token, "name": name, "tier": tier, "age_days": age_days, "saved": float(saved)}
+        raise HTTPException(status_code=403, detail="Invalid Virtual API Key.")
+    ws_id, uid, ktype, rpm, budget, spend, ws_name, plan, role = row
+    if float(spend) >= float(budget):
+        raise HTTPException(status_code=402, detail="Monthly workspace budget limit reached.")
+    return {"token": token, "workspace_id": ws_id, "user_id": uid, "key_type": ktype, "rpm": int(rpm), "ws_name": ws_name, "plan_tier": plan, "role": role}
+
+async def fast_llm_call(clean_p: str, max_tokens: int = 400):
+    if GEMINI_KEY:
+        r = await http.post(f"https://googleapis.com{GEMINI_KEY}", json={"contents": [{"parts": [{"text": clean_p}]}], "generationConfig": {"maxOutputTokens": max_tokens}})
+        if r.status_code == 200:
+            return r.json()["candidates"][0]["content"]["parts"][0]["text"], "google/gemini-2.5-flash"
+    if OPENAI_KEY:
+        r = await http.post("https://openai.com", headers={"Authorization": f"Bearer {OPENAI_KEY}"}, json={"model": "gpt-4o-mini", "max_tokens": max_tokens, "messages": [{"role": "user", "content": clean_p}]})
+        if r.status_code == 200:
+            return r.json()["choices"][0]["message"]["content"], "openai/gpt-4o-mini"
+    if OPENROUTER_KEY:
+        r = await http.post("https://openrouter.ai", headers={"Authorization": f"Bearer {OPENROUTER_KEY}"}, json={"model": "meta-llama/llama-3.3-70b-instruct:free", "max_tokens": max_tokens, "messages": [{"role": "user", "content": clean_p}]})
+        if r.status_code == 200:
+            return r.json()["choices"][0]["message"]["content"], "meta-llama/llama-3.3-70b:free"
+    raise HTTPException(status_code=502, detail="Configure GEMINI_API_KEY, OPENAI_API_KEY, or OPENROUTER_API_KEY in Render.")
 
 @app.get("/", response_class=HTMLResponse)
 async def home():
@@ -107,77 +144,14 @@ async def home():
         if fname.endswith(".html"):
             with open(fname, "r", encoding="utf-8") as f:
                 return HTMLResponse(content=f.read())
-    return HTMLResponse(content="<h1>No .html file found in repository</h1>")
+    return HTMLResponse(content="<h1>No .html file found</h1>")
 
-@app.get("/v1/telemetry")
-async def telemetry():
-    conn, _ = get_db()
-    cur = conn.cursor()
-    cur.execute("SELECT saved_usd, raw_usd, created_at, tier FROM zdr_keys WHERE api_key = 'optx_free_trial_user'")
-    row = cur.fetchone() or (118.40, 159.35, datetime.utcnow().isoformat(), "trial")
-    cur.execute("SELECT reason, model, tokens, latency_ms, pii_count, saved_usd FROM zdr_traces ORDER BY rowid DESC LIMIT 6")
-    t_rows = cur.fetchall()
-    cur.close()
-    conn.close()
-    saved_u, raw_u, created_s, tier_s = row
-    age = (datetime.utcnow() - datetime.fromisoformat(created_s)).days
-    traces = [{"reason": rsn, "model": mdl, "tokens": tok, "latency": lat, "pii": pii, "saved": round(float(sav), 4)} for rsn, mdl, tok, lat, pii, sav in t_rows]
-    if not traces:
-        traces = [{"reason": "Boilerplate Refactor", "model": "gemini-2.5-flash", "tokens": 420, "latency": 185.4, "pii": 1, "saved": 0.042}]
-    return {"saved": float(saved_u), "raw": float(raw_u), "show_day12": (tier_s == "trial" and age >= 12), "traces": traces}
-
-@app.post("/start-trial", response_class=HTMLResponse)
-async def start_trial(name: str = Form(...), email: str = Form(...)):
+@app.get("/api/dashboard/me")
+async def dashboard_me(ctx: dict = Depends(get_auth_context)):
     conn, ph = get_db()
     cur = conn.cursor()
-    cur.execute(f"SELECT api_key FROM zdr_keys WHERE email = {ph}", (email,))
-    row = cur.fetchone()
-    if row:
-        (key,) = row
-    else:
-        key = f"optx_trial_{secrets.token_hex(8)}"
-        cur.execute(f"INSERT INTO zdr_keys VALUES ({ph},{ph},{ph},{ph},{ph},{ph},{ph},{ph})", (key, name, email, "trial", datetime.utcnow().isoformat(), 0, 0.0, 0.0))
-        conn.commit()
-    cur.close()
-    conn.close()
-    return HTMLResponse(content=f"<body style='background:#030712;color:#fff;font-family:sans-serif;text-align:center;padding:60px'><h2 style='color:#00f5d4'>14-Day BYOK Trial Key Ready!</h2><p>Copy Key: <b style='color:#38bdf8'>{key}</b></p><a href='/' style='color:#38bdf8'>← Return to OptiMax Quantum</a></body>")
-
-@app.get("/upgrade")
-async def upgrade(plan: str = "pro"):
-    return RedirectResponse(url={"pro": LEMON_PRO, "scale": LEMON_SCALE, "enterprise": LEMON_ENT}.get(plan, LEMON_PRO), status_code=303)
-
-@app.post("/v1/route")
-async def route(req: PromptReq, user: dict = Depends(verify_user)):
-    t0 = time.perf_counter()
-    verdict = shield.inspect_payload(req.prompt)
-    if not verdict.get("safe", True):
-        raise HTTPException(status_code=400, detail=f"Blocked: {verdict.get('reason')}")
-    clean_p, vault = pii_redact(req.prompt)
-    reason = "Strict Privacy Redaction" if req.preset == "strict_privacy" else ("Frontier Reasoning" if req.preset == "balanced" else "Boilerplate / Fast Code")
-    c_key = hashlib.sha256(f"{req.preset}:{clean_p.lower()}".encode()).hexdigest()
-    if c_key in CACHE:
-        lat = round((time.perf_counter() - t0) * 1000, 2)
-        asyncio.create_task(log_metadata_nonblocking(user["token"], "Semantic Cache Hit", "semantic-cache", len(clean_p.split()), lat, len(vault), 0.045, 0.045))
-        return {"status": "success", "zdr_mode": "active", "routing_reason": "Semantic Cache Hit", "pii_masked": len(vault), "model": "semantic-cache", "latency_ms": lat, "response": pii_restore(CACHE[c_key], vault)}
-    ans, used = "", ""
-    if GEMINI_KEY and req.preset in ["max_savings", "strict_privacy"]:
-        r = await http.post(f"https://googleapis.com{GEMINI_KEY}", json={"contents": [{"parts": [{"text": clean_p}]}]})
-        if r.status_code == 200:
-            ans, used = r.json()["candidates"][0]["content"]["parts"][0]["text"], "google/gemini-2.5-flash"
-    if not ans and OPENAI_KEY:
-        m_name = "gpt-4o" if req.preset == "balanced" else "gpt-4o-mini"
-        r = await http.post("https://openai.com", headers={"Authorization": f"Bearer {OPENAI_KEY}"}, json={"model": m_name, "messages": [{"role": "user", "content": clean_p}]})
-        if r.status_code == 200:
-            ans, used = r.json()["choices"][0]["message"]["content"], f"openai/{m_name}"
-    if not ans and OPENROUTER_KEY:
-        target = "meta-llama/llama-3.3-70b-instruct:free"
-        r = await http.post("https://openrouter.ai", headers={"Authorization": f"Bearer {OPENROUTER_KEY}"}, json={"model": target, "messages": [{"role": "user", "content": clean_p}]})
-        if r.status_code == 200:
-            ans, used = r.json()["choices"][0]["message"]["content"], target
-    if not ans:
-        raise HTTPException(status_code=502, detail="Configure GEMINI_API_KEY, OPENAI_API_KEY, or OPENROUTER_API_KEY in Render.")
-    CACHE[c_key] = ans
-    lat = round((time.perf_counter() - t0) * 1000, 2)
-    toks = len(clean_p.split()) + len(ans.split())
-    raw_c, saved_c = round(max(0.015, toks * 0.0001), 4), round(max(0.011, toks * 0.0000743), 4)
-    asyncio.create_task(log_metadata_nonblocking(user["token"], reason, used, toks, lat, len(vault), saved_c, raw_c))
+    cur.execute(f"SELECT COALESCE(SUM(saved_usd),0), COALESCE(SUM(tokens),0), COALESCE(SUM(pii_count),0) FROM request_logs WHERE user_id = {ph}", (ctx["user_id"],))
+    saved, toks, pii = cur.fetchone()
+    cur.execute(f"SELECT api_key, key_type, rate_limit_rpm, current_spend, monthly_budget_limit FROM api_keys WHERE user_id = {ph}", (ctx["user_id"],))
+    keys = [{"key": k[:14] + "...", "full_key": k, "type": t, "rpm": r, "spend": float(s), "budget": float(b)} for k, t, r, s, b in cur.fetchall()]
+    cur.execute(f"SELECT reason, model, tokens, latency_ms, device_id, saved_usd, cache_hit FROM request_logs WHERE user_id = {ph} ORDER BY rowid DESC LIMIT 8", (ctx["user_id"],))
