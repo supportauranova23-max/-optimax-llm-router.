@@ -122,8 +122,10 @@ async def fast_llm_call(clean_p: str, max_tokens: int = 400):
 
 @app.get("/", response_class=HTMLResponse)
 async def home():
-    with open("index.html", "r", encoding="utf-8") as f:
-        return HTMLResponse(content=f.read())
+    if os.path.exists("index.html"):
+        with open("index.html", "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
+    return HTMLResponse(content="<h1>index.html is missing from root folder</h1>", status_code=404)
 
 @app.get("/upgrade")
 async def upgrade():
@@ -178,5 +180,3 @@ async def dashboard_org(user: dict = Depends(verify_user)):
     conn, _ = get_db()
     cur = conn.cursor()
     cur.execute("SELECT COALESCE(SUM(saved_usd),0) FROM litellm_keys")
-    (org_saved,) = cur.fetchone()
-    cur.execute("SELECT COUNT(DISTINCT device_id), COALESCE(AVG(cache_hit),0) FROM edge_meta_logs WHERE device_id IS NOT NULL")
