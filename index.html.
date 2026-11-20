@@ -1,99 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OptiMax Quantum | Neural & Edge AI Gateway</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#030712;color:#f1f5f9;display:flex;min-height:100vh;position:relative}
+.glow-bg{position:fixed;inset:0;background:radial-gradient(circle at 15% 15%,rgba(56,189,248,0.12),transparent 40%),radial-gradient(circle at 85% 80%,rgba(0,245,212,0.1),transparent 40%);pointer-events:none;z-index:0}
+.side,.main,.modal{position:relative;z-index:2}
+.side{width:235px;background:#0a0f1c;border-right:1px solid #1e293b;padding:18px 12px;display:flex;flex-direction:column;justify-content:space-between}
+.logo{font-weight:800;font-size:16px;color:#00f5d4;padding-bottom:14px;border-bottom:1px solid #1e293b}
+.nav{margin-top:14px;display:flex;flex-direction:column;gap:5px}
+.nav button{background:none;border:none;color:#94a3b8;padding:10px 12px;border-radius:8px;text-align:left;font-size:13.5px;font-weight:600;cursor:pointer}
+.nav button.active,.nav button:hover{background:#1e293b;color:#38bdf8}
+.main{flex:1;padding:20px;max-width:1080px;margin:0 auto;width:100%}
+.topbar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;background:#0a0f1c;border:1px solid #1e293b;padding:10px 16px;border-radius:10px;margin-bottom:16px}
+.switcher{display:inline-flex;background:#030712;border:1px solid #334155;border-radius:20px;padding:3px}
+.switcher button{background:none;border:none;color:#94a3b8;padding:6px 14px;border-radius:16px;font-size:12.5px;font-weight:700;cursor:pointer}
+.switcher button.active{background:linear-gradient(90deg,#00f5d4,#0284c7);color:#022c22}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
+.kpi{background:#0f172a;border:1px solid #1e293b;padding:14px;border-radius:10px}
+.kpi small{color:#94a3b8;font-size:11px;text-transform:uppercase}.kpi div{font-size:20px;font-weight:800;margin-top:4px;color:#00f5d4}
+.panel{display:none;background:#0f172a;border:1px solid #1e293b;border-radius:12px;padding:18px}.panel.active{display:block}
+.presets{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.pre-btn{background:#030712;border:1px solid #334155;color:#cbd5e1;padding:10px;border-radius:8px;cursor:pointer;text-align:left;font-size:12px}
+.pre-btn.active{border-color:#00f5d4;background:rgba(0,245,212,0.12);color:#fff}
+input,textarea{width:100%;padding:10px;border-radius:8px;border:1px solid #334155;background:#030712;color:#fff;margin:6px 0 10px;font-size:13px}
+.btn{background:#0284c7;color:#fff;border:none;padding:9px 15px;border-radius:8px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-block;font-size:12.5px}
+.cta{background:linear-gradient(90deg,#00f5d4,#10b981);color:#022c22;font-weight:800}
+pre{background:#020617;border:1px solid #1e293b;padding:12px;border-radius:8px;color:#00f5d4;white-space:pre-wrap;font-size:12px;margin:8px 0}
+.modal{display:none;position:fixed;inset:0;background:rgba(2,6,23,0.85);align-items:center;justify-content:center;z-index:50;padding:16px}
+.modal-box{background:#0f172a;border:1px solid #00f5d4;border-radius:14px;padding:24px;max-width:440px;width:100%;text-align:center}
+@media(max-width:768px){body{flex-direction:column}.side{width:100%}.nav{flex-direction:row;overflow-x:auto}.kpis,.presets{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="glow-bg"></div>
+<div class="side">
+  <div>
+    <div class="logo">⚡ OPTIMAX QUANTUM</div>
+    <div class="nav">
+      <button id="b-play" class="active" onclick="tab('play',this)">⚡ Neural Playground</button>
+      <button id="b-ide" onclick="tab('ide',this)">🔌 Connect IDE</button>
+      <button id="b-iot" onclick="tab('iot',this)">📡 Edge & IoT Fleet</button>
+      <button id="b-logs" onclick="tab('logs',this)">📊 Route Trace Log</button>
+      <button id="b-keys" onclick="tab('keys',this)">🔑 14-Day Trial Key</button>
+    </div>
+  </div>
+  <a href="/upgrade" target="_blank" class="btn cta" style="text-align:center">Upgrade Enterprise</a>
+</div>
+<div class="main">
+  <div class="topbar">
+    <span style="color:#00f5d4;font-size:12px;font-weight:700">🛡️ Zero-Data-Retention: ACTIVE</span>
+    <div class="switcher">
+      <button id="sw-me" class="active" onclick="switchRole('me')">Personal View</button>
+      <button id="sw-org" onclick="switchRole('org')">Team Admin</button>
+    </div>
+    <input id="key" value="optx_free_trial_user" onchange="refreshDash();renderIDE()" style="width:210px;margin:0;padding:6px 10px;font-size:12px" placeholder="API Key">
+  </div>
+  <div class="kpis">
+    <div class="kpi"><small id="k1-lbl">Personal Savings</small><div id="k1-val">$0.00</div></div>
+    <div class="kpi"><small id="k2-lbl">Tokens Routed</small><div id="k2-val" style="color:#38bdf8">0</div></div>
+    <div class="kpi"><small id="k3-lbl">PII Masked</small><div id="k3-val" style="color:#fff">0</div></div>
+  </div>
+
+  <div id="play" class="panel active">
+    <div class="presets">
+      <button class="pre-btn active" onclick="setPreset('max_savings',this)"><b>💰 Max Savings (74% Off)</b><br><small style="color:#94a3b8">Gemini Flash / Mini for code</small></button>
+      <button class="pre-btn" onclick="setPreset('balanced',this)"><b>⚖️ Balanced Quality</b><br><small style="color:#94a3b8">Frontier plan + fast execution</small></button>
+      <button class="pre-btn" onclick="setPreset('strict_privacy',this)"><b>🔒 Strict Privacy</b><br><small style="color:#94a3b8">Zero-retention + PII redaction</small></button>
+    </div>
+    <textarea id="prm" rows="3" placeholder="Paste code or prompt (Zero prompt logging enforced)..."></textarea>
+    <button onclick="runIDE()" class="btn">Execute Neural Route →</button>
+    <pre id="out">// Metadata telemetry & response...</pre>
+  </div>
+  <div id="ide" class="panel">
+    <h3 style="margin-top:0">🔌 1-Click Connect IDE Config Generator</h3>
+    <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+      <button class="btn" onclick="setIDE('cursor')">Cursor</button>
+      <button class="btn" onclick="setIDE('cline')">Cline (VS Code)</button>
+      <button class="btn" onclick="setIDE('windsurf')">Windsurf</button>
+      <button class="btn" onclick="setIDE('continue')">Continue.dev</button>
+    </div>
+    <pre id="ideBox" style="color:#38bdf8"></pre>
+    <button onclick="copyIDE(this)" class="btn cta">📋 Copy IDE Config</button>
+  </div>
+  <div id="iot" class="panel">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <h3 style="margin:0">📡 Edge & IoT Lightweight Gateway (<code>/v1/edge/chat</code>)</h3>
+      <button onclick="genIoTKey()" class="btn cta">+ Generate IoT Device Key</button>
+    </div>
+    <p style="font-size:12.5px;color:#94a3b8">Sliding-window 60 RPM loop protection + 24h semantic cache (&lt;5ms, $0.00 cost).</p>
+    <pre id="iotKeyBox" style="color:#38bdf8">// Click "+ Generate IoT Device Key" or test with key: optx_live_prod_99x1</pre>
+  </div>
+  <div id="logs" class="panel">
+    <h3 style="margin-top:0">📊 Live Zero-Payload Route Trace Log</h3>
+    <div id="logFeed" style="font-size:13px"></div>
+  </div>
+  <div id="keys" class="panel">
+    <h3 style="margin-top:0">🔑 Get Your 14-Day Free Trial Key</h3>
+    <form action="/start-trial" method="post">
+      <input name="name" placeholder="Developer or Team Name" required>
+      <input name="email" type="email" placeholder="Work Email" required>
+      <button type="submit" class="btn cta">Generate 14-Day Trial Key →</button>
+    </form>
+  </div>
+</div>
+<div id="upModal" class="modal">
+  <div class="modal-box">
+    <h3 style="margin-top:0;color:#00f5d4">🔒 Unlock Team Admin & IoT Fleet View</h3>
+    <p style="font-size:13px;color:#cbd5e1">Your current key is on a <b>Personal / Trial</b> tier. Upgrade via Lemon Squeezy to unlock the <b>Team Admin</b> dashboard.</p>
+    <div style="display:flex;gap:10px;justify-content:center;margin-top:16px">
+      <a href="/upgrade" target="_blank" class="btn cta">Upgrade via Lemon Squeezy →</a>
+      <button onclick="document.getElementById('upModal').style.display='none'" class="btn" style="background:#1e293b">Close</button>
+    </div>
+  </div>
+</div>
 <script>
-let ROLE = 'me';
-
-function tab(id, b) {
-  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.nav button').forEach(x => x.classList.remove('active'));
-  const target = document.getElementById(id);
-  if (target) target.classList.add('active');
-  if (b) b.classList.add('active');
+let ROLE='me',PRESET='max_savings',CUR_IDE='cursor';
+function tab(id,b){document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));document.getElementById(id).classList.add('active');if(b)b.classList.add('active')}
+function setPreset(p,b){PRESET=p;document.querySelectorAll('.pre-btn').forEach(x=>x.classList.remove('active'));b.classList.add('active')}
+function setIDE(t){CUR_IDE=t;renderIDE()}
+function renderIDE(){const k=document.getElementById('key').value.trim()||'optx_free_trial_user';const u='https://onrender.com cfg={cursor:`{\n  "openai.apiKey": "${k}",\n  "openai.baseUrl": "${u}"\n}`,cline:`{\n  "apiProvider": "openai",\n  "openAiBaseUrl": "${u}",\n  "openAiApiKey": "${k}"\n}`,windsurf:`{\n  "windsurf.customApiUrl": "${u}",\n  "windsurf.apiKey": "${k}"\n}`,continue:`{\n  "models": [{"title":"OptiMax","provider":"openai","apiBase":"${u}","apiKey":"${k}"}]\n}`};document.getElementById('ideBox').textContent=cfg[CUR_IDE]}
+function copyIDE(b){navigator.clipboard.writeText(document.getElementById('ideBox').textContent);b.textContent='✓ Copied!';setTimeout(()=>b.textContent='📋 Copy IDE Config',1500)}
+async function switchRole(r){
+  const k=document.getElementById('key').value.trim();
+  const res=await fetch(r==='org'?'/api/dashboard/org':'/api/dashboard/me',{headers:{'Authorization':'Bearer '+k}});
+  const d=await res.json();
+  if(res.status===403&&d.upgrade_required){document.getElementById('upModal').style.display='flex';return;}
+  ROLE=r;
+  document.getElementById('sw-me').classList.toggle('active',r==='me');
+  document.getElementById('sw-org').classList.toggle('active',r==='org');
+  document.getElementById('k1-lbl').textContent=r==='me'?'Personal Savings':'Org Savings';
+  document.getElementById('k1-val').textContent='$'+(r==='me'?(d.saved_usd||0):(d.org_saved_usd||0));
+  document.getElementById('k2-lbl').textContent=r==='me'?'Tokens Routed':'Active IoT Devices';
+  document.getElementById('k2-val').textContent=r==='me'?(d.tokens_routed||0):(d.active_iot_devices||0);
+  document.getElementById('k3-lbl').textContent=r==='me'?'PII Masked':'Rogue Loops Blocked';
+  document.getElementById('k3-val').textContent=r==='me'?(d.pii_masked||0):(d.rogue_loops_blocked||0);
+  document.getElementById('logFeed').innerHTML=(d.logs||[]).map(l=>`<div style='padding:8px;border-bottom:1px solid #1e293b'><b>[${l.device_id}]</b> ${l.model} • ${l.tokens} tok • ${l.latency}ms • <span style='color:#00f5d4'>Saved $${l.saved}</span></div>`).join('')||'No traces yet.';
 }
-
-async function switchRole(r) {
-  const k = document.getElementById('key').value.trim();
-  const out = document.getElementById('out');
-  try {
-    const url = r === 'org' ? '/api/dashboard/org' : '/api/dashboard/me';
-    const res = await fetch(url, { headers: { 'Authorization': 'Bearer ' + k } });
-    const d = await res.json();
-    
-    if (res.status === 403 && d.upgrade_required) {
-      document.getElementById('upModal').style.display = 'flex';
-      return;
-    }
-    if (!res.ok) {
-      out.textContent = 'API Error (' + res.status + '): ' + (d.detail || JSON.stringify(d));
-      return;
-    }
-
-    ROLE = r;
-    document.getElementById('sw-me').classList.toggle('active', r === 'me');
-    document.getElementById('sw-org').classList.toggle('active', r === 'org');
-
-    if (r === 'me') {
-      document.getElementById('k1-lbl').textContent = 'Personal Savings';
-      document.getElementById('k1-val').textContent = '$' + (d.saved_usd || 0);
-      document.getElementById('k2-lbl').textContent = 'Tokens Routed';
-      document.getElementById('k2-val').textContent = d.tokens_routed || 0;
-      document.getElementById('k3-lbl').textContent = 'PII Masked';
-      document.getElementById('k3-val').textContent = d.pii_masked || 0;
-    } else {
-      document.getElementById('k1-lbl').textContent = 'Org Savings (' + (d.workspace || 'Team') + ')';
-      document.getElementById('k1-val').textContent = '$' + (d.org_saved_usd || 0);
-      document.getElementById('k2-lbl').textContent = 'Active IoT Devices';
-      document.getElementById('k2-val').textContent = (d.active_iot_devices || 0) + ' (' + (d.cache_hit_pct || 0) + '% Cache)';
-      document.getElementById('k3-lbl').textContent = 'Rogue Loops Blocked';
-      document.getElementById('k3-val').textContent = d.rogue_loops_blocked || 0;
-    }
-
-    document.getElementById('logFeed').innerHTML = (d.logs || [])
-      .map(l => `<div style='padding:8px;border-bottom:1px solid #1e293b'><b>[${l.device_id}]</b> ${l.model} • ${l.tokens} tok • ${l.latency}ms • <span style='color:#00f5d4'>Saved $${l.saved}</span></div>`)
-      .join('') || '<p style="color:#94a3b8">No logs recorded yet.</p>';
-  } catch (err) {
-    out.textContent = 'Network Error: ' + err.message;
-  }
-}
-
-function refreshDash() {
-  switchRole(ROLE);
-}
-
-async function genIoTKey() {
-  const box = document.getElementById('iotKeyBox');
-  box.textContent = 'Generating IoT Fleet Key...';
-  try {
-    const r = await fetch('/api/keys/iot', {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + document.getElementById('key').value.trim() }
-    });
-    const d = await r.json();
-    box.textContent = r.ok ? ('New IoT Fleet Key (60 RPM Limit): ' + d.api_key) : ('Error: ' + (d.detail || JSON.stringify(d)));
-  } catch (err) {
-    box.textContent = 'Network Error: ' + err.message;
-  }
-}
-
-async function runIDE() {
-  const o = document.getElementById('out');
-  o.textContent = 'Routing via Zero-Retention Edge...';
-  try {
-    const r = await fetch('/v1/route', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + document.getElementById('key').value.trim()
-      },
-      body: JSON.stringify({ prompt: document.getElementById('prm').value })
-    });
-    const d = await r.json();
-    o.textContent = JSON.stringify(d, null, 2);
-    if (r.ok) refreshDash();
-  } catch (err) {
-    o.textContent = 'Route Error: ' + err.message;
-  }
-}
-
-window.addEventListener('DOMContentLoaded', () => switchRole('me'));
+function refreshDash(){switchRole(ROLE)}
+async function genIoTKey(){const r=await fetch('/api/keys/iot',{method:'POST',headers:{'Authorization':'Bearer '+document.getElementById('key').value.trim()}});const d=await r.json();document.getElementById('iotKeyBox').textContent=r.ok?('New IoT Key: '+d.api_key):JSON.stringify(d)}
+async function runIDE(){const o=document.getElementById('out');o.textContent='Routing ('+PRESET+')...';const r=await fetch('/v1/route',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+document.getElementById('key').value.trim()},body:JSON.stringify({prompt:document.getElementById('prm').value,preset:PRESET})});o.textContent=JSON.stringify(await r.json(),null,2);refreshDash()}
+renderIDE();switchRole('me');
 </script>
 </body>
 </html>
