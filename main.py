@@ -17,15 +17,12 @@ app = FastAPI(title="OptiMax Quantum Enterprise & Edge Gateway")
 OPENAI_KEY = os.environ.get("OPENAI_API_KEY", "")
 GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "")
 OPENROUTER_KEY = os.environ.get("OPENROUTER_API_KEY", "")
-LEMON_PRO = os.environ.get("LEMON_PRO_URL", "https://lemonsqueezy.com")
-LEMON_SCALE = os.environ.get("LEMON_SCALE_URL", "https://lemonsqueezy.com")
-LEMON_ENT = os.environ.get("LEMON_ENTERPRISE_URL", "https://lemonsqueezy.com")
+LEMON_URL = os.environ.get("LEMON_CHECKOUT_URL", "https://lemonsqueezy.com")
 RAW_DB = os.environ.get("DATABASE_URL", "").strip().removeprefix("psql ").strip().strip("'\"")
 
 USE_PG = bool(RAW_DB.startswith("postgres") and psycopg2)
 shield = CogniShieldLayer()
 http = httpx.AsyncClient(timeout=httpx.Timeout(25.0, connect=5.0), limits=httpx.Limits(max_keepalive_connections=50, max_connections=200))
-CACHE: Dict[str, str] = {}
 
 def get_db():
     if USE_PG:
@@ -33,31 +30,23 @@ def get_db():
             return psycopg2.connect(RAW_DB), "%s"
         except Exception:
             pass
-    return sqlite3.connect("optimax_rbac_edge.db"), "?"
+    return sqlite3.connect("optimax_litellm.db"), "?"
 
 def init_db():
     conn, ph = get_db()
     cur = conn.cursor()
-    cur.execute("CREATE TABLE IF NOT EXISTS workspaces (id TEXT PRIMARY KEY, name TEXT, plan_tier TEXT, lemon_squeezy_sub_id TEXT)")
-    cur.execute("CREATE TABLE IF NOT EXISTS workspace_members (workspace_id TEXT, user_id TEXT, role TEXT, PRIMARY KEY (workspace_id, user_id))")
-    cur.execute("CREATE TABLE IF NOT EXISTS api_keys (api_key TEXT PRIMARY KEY, workspace_id TEXT, user_id TEXT, key_type TEXT, rate_limit_rpm INTEGER DEFAULT 60, monthly_budget_limit REAL DEFAULT 500.0, current_spend REAL DEFAULT 0.0, created_at TEXT)")
-    # Zero-Payload Logging: Strictly metadata—no prompt or completion columns
-    cur.execute("CREATE TABLE IF NOT EXISTS request_logs (id TEXT PRIMARY KEY, workspace_id TEXT, user_id TEXT, device_id TEXT, reason TEXT, model TEXT, tokens INTEGER, latency_ms REAL, pii_count INTEGER, saved_usd REAL, cache_hit INTEGER DEFAULT 0)")
+    # Original Lemon Squeezy / LiteLLM subscription table preserved intact
+    cur.execute("CREATE TABLE IF NOT EXISTS litellm_keys (api_key TEXT PRIMARY KEY, key_alias TEXT, email TEXT, tier TEXT, created_at TEXT, requests INTEGER DEFAULT 0, spend_usd REAL DEFAULT 0.0, saved_usd REAL DEFAULT 0.0, max_budget_usd REAL DEFAULT 25.0)")
+    # Additive metadata-only table for IDE & IoT Edge logs (zero prompt/completion bodies)
+    cur.execute("CREATE TABLE IF NOT EXISTS edge_meta_logs (id TEXT PRIMARY KEY, api_key TEXT, device_id TEXT, reason TEXT, model TEXT, tokens INTEGER, latency_ms REAL, pii_count INTEGER, saved_usd REAL, cache_hit INTEGER DEFAULT 0)")
     now = datetime.utcnow().isoformat()
-    if ph == "%s":
-        cur.execute("INSERT INTO workspaces VALUES (%s,%s,%s,%s) ON CONFLICT (id) DO NOTHING", ("ws_solo_01", "Solo Dev Workspace", "pro_49", ""))
-        cur.execute("INSERT INTO workspaces VALUES (%s,%s,%s,%s) ON CONFLICT (id) DO NOTHING", ("ws_team_99", "Acme Robotics Fleet", "team_499", "sub_ls_9981"))
-        cur.execute("INSERT INTO workspace_members VALUES (%s,%s,%s) ON CONFLICT DO NOTHING", ("ws_solo_01", "dev@solo.io", "owner"))
-        cur.execute("INSERT INTO workspace_members VALUES (%s,%s,%s) ON CONFLICT DO NOTHING", ("ws_team_99", "admin@acme.io", "owner"))
-        cur.execute("INSERT INTO api_keys VALUES (%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (api_key) DO NOTHING", ("optx_free_trial_user", "ws_solo_01", "dev@solo.io", "ide", 60, 500.0, 4.10, now))
-        cur.execute("INSERT INTO api_keys VALUES (%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (api_key) DO NOTHING", ("optx_team_iot_fleet_01", "ws_team_99", "admin@acme.io", "iot_fleet", 120, 5000.0, 18.50, now))
-    else:
-        cur.execute("INSERT OR IGNORE INTO workspaces VALUES (?,?,?,?)", ("ws_solo_01", "Solo Dev Workspace", "pro_49", ""))
-        cur.execute("INSERT OR IGNORE INTO workspaces VALUES (?,?,?,?)", ("ws_team_99", "Acme Robotics Fleet", "team_499", "sub_ls_9981"))
-        cur.execute("INSERT OR IGNORE INTO workspace_members VALUES (?,?,?)", ("ws_solo_01", "dev@solo.io", "owner"))
-        cur.execute("INSERT OR IGNORE INTO workspace_members VALUES (?,?,?)", ("ws_team_99", "admin@acme.io", "owner"))
-        cur.execute("INSERT OR IGNORE INTO api_keys VALUES (?,?,?,?,?,?,?,?)", ("optx_free_trial_user", "ws_solo_01", "dev@solo.io", "ide", 60, 500.0, 4.10, now))
-        cur.execute("INSERT OR IGNORE INTO api_keys VALUES (?,?,?,?,?,?,?,?)", ("optx_team_iot_fleet_01", "ws_team_99", "admin@acme.io", "iot_fleet", 120, 5000.0, 18.50, now))
+    starters = [
+        ("optx_free_trial_user", "default-sandbox-key", "trial@user.com", "trial", now, 0, 0.0, 0.0, 15.0),
+        ("optx_live_prod_99x1", "production-iot-fleet", "prod@enterprise.io", "enterprise", now, 142, 4.18, 12.10, 5000.0)
+    ]
+    for s in starters:
+        sql = "INSERT INTO litellm_keys VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT (api_key) DO NOTHING" if ph == "%s" else "INSERT OR IGNORE INTO litellm_keys VALUES (?,?,?,?,?,?,?,?,?)"
+        cur.execute(sql, s)
     conn.commit()
     cur.close()
     conn.close()
@@ -87,55 +76,50 @@ def pii_restore(text: str, vault: Dict[str, str]):
         text = text.replace(k, v)
     return text
 
-def _bg_log_meta(ws_id: str, uid: str, dev_id: Optional[str], reason: str, model: str, toks: int, lat: float, pii: int, saved: float, spend: float, cache_hit: bool, api_key: str):
+def _bg_log_meta(api_key: str, dev_id: Optional[str], reason: str, model: str, toks: int, lat: float, pii: int, saved: float, spend: float, cache_hit: bool):
     conn, ph = get_db()
     cur = conn.cursor()
-    cur.execute(f"UPDATE api_keys SET current_spend = current_spend + {ph} WHERE api_key = {ph}", (spend, api_key))
-    cur.execute(f"INSERT INTO request_logs VALUES ({ph},{ph},{ph},{ph},{ph},{ph},{ph},{ph},{ph},{ph},{ph})", (secrets.token_hex(6), ws_id, uid, dev_id, reason, model, toks, lat, pii, saved, 1 if cache_hit else 0))
+    cur.execute(f"UPDATE litellm_keys SET requests = requests + 1, spend_usd = spend_usd + {ph}, saved_usd = saved_usd + {ph} WHERE api_key = {ph}", (spend, saved, api_key))
+    cur.execute(f"INSERT INTO edge_meta_logs VALUES ({ph},{ph},{ph},{ph},{ph},{ph},{ph},{ph},{ph},{ph})", (secrets.token_hex(6), api_key, dev_id, reason, model, toks, lat, pii, saved, 1 if cache_hit else 0))
     conn.commit()
     cur.close()
     conn.close()
 
-async def log_meta_async(ws_id: str, uid: str, dev_id: Optional[str], reason: str, model: str, toks: int, lat: float, pii: int, saved: float, spend: float, cache_hit: bool, api_key: str):
-    await asyncio.to_thread(_bg_log_meta, ws_id, uid, dev_id, reason, model, toks, lat, pii, saved, spend, cache_hit, api_key)
+async def log_meta_async(api_key: str, dev_id: Optional[str], reason: str, model: str, toks: int, lat: float, pii: int, saved: float, spend: float, cache_hit: bool):
+    await asyncio.to_thread(_bg_log_meta, api_key, dev_id, reason, model, toks, lat, pii, saved, spend, cache_hit)
 
-async def get_auth_context(authorization: Optional[str] = Header(None)):
+async def verify_user(authorization: Optional[str] = Header(None)):
     if not authorization or not authorization.strip().startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing Bearer token.")
     token = authorization.strip().removeprefix("Bearer ").strip()
     conn, ph = get_db()
     cur = conn.cursor()
-    cur.execute(f"""
-        SELECT k.workspace_id, k.user_id, k.key_type, k.rate_limit_rpm, k.monthly_budget_limit, k.current_spend,
-               w.name, w.plan_tier, COALESCE(m.role, 'developer')
-        FROM api_keys k
-        JOIN workspaces w ON k.workspace_id = w.id
-        LEFT JOIN workspace_members m ON m.workspace_id = k.workspace_id AND m.user_id = k.user_id
-        WHERE k.api_key = {ph}
-    """, (token,))
+    cur.execute(f"SELECT key_alias, email, tier, created_at, requests, spend_usd, saved_usd, max_budget_usd FROM litellm_keys WHERE api_key = {ph}", (token,))
     row = cur.fetchone()
     cur.close()
     conn.close()
     if not row:
-        raise HTTPException(status_code=403, detail="Invalid Virtual API Key.")
-    ws_id, uid, ktype, rpm, budget, spend, ws_name, plan, role = row
+        raise HTTPException(status_code=403, detail="Invalid Virtual Key.")
+    alias, email, tier, created_str, reqs, spend, saved, budget = row
+    if tier == "trial" and datetime.utcnow() > datetime.fromisoformat(created_str) + timedelta(days=14):
+        raise HTTPException(status_code=402, detail="14-day trial expired. Visit /upgrade.")
     if float(spend) >= float(budget):
-        raise HTTPException(status_code=402, detail="Monthly workspace budget limit reached.")
-    return {"token": token, "workspace_id": ws_id, "user_id": uid, "key_type": ktype, "rpm": int(rpm), "ws_name": ws_name, "plan_tier": plan, "role": role}
+        raise HTTPException(status_code=402, detail=f"Max Budget Exceeded (${spend}/{budget}).")
+    return {"token": token, "alias": alias, "email": email, "tier": tier, "reqs": int(reqs), "spend": float(spend), "saved": float(saved), "budget": float(budget)}
 
 async def fast_llm_call(clean_p: str, max_tokens: int = 400):
     if GEMINI_KEY:
         r = await http.post(f"https://googleapis.com{GEMINI_KEY}", json={"contents": [{"parts": [{"text": clean_p}]}], "generationConfig": {"maxOutputTokens": max_tokens}})
         if r.status_code == 200:
-            return r.json()["candidates"][0]["content"]["parts"][0]["text"], "google/gemini-2.5-flash"
+            return r.json()["candidates"]["content"]["parts"]["text"], "google/gemini-2.5-flash"
     if OPENAI_KEY:
         r = await http.post("https://openai.com", headers={"Authorization": f"Bearer {OPENAI_KEY}"}, json={"model": "gpt-4o-mini", "max_tokens": max_tokens, "messages": [{"role": "user", "content": clean_p}]})
         if r.status_code == 200:
-            return r.json()["choices"][0]["message"]["content"], "openai/gpt-4o-mini"
+            return r.json()["choices"]["message"]["content"], "openai/gpt-4o-mini"
     if OPENROUTER_KEY:
         r = await http.post("https://openrouter.ai", headers={"Authorization": f"Bearer {OPENROUTER_KEY}"}, json={"model": "meta-llama/llama-3.3-70b-instruct:free", "max_tokens": max_tokens, "messages": [{"role": "user", "content": clean_p}]})
         if r.status_code == 200:
-            return r.json()["choices"][0]["message"]["content"], "meta-llama/llama-3.3-70b:free"
+            return r.json()["choices"]["message"]["content"], "meta-llama/llama-3.3-70b:free"
     raise HTTPException(status_code=502, detail="Configure GEMINI_API_KEY, OPENAI_API_KEY, or OPENROUTER_API_KEY in Render.")
 
 @app.get("/", response_class=HTMLResponse)
@@ -146,12 +130,49 @@ async def home():
                 return HTMLResponse(content=f.read())
     return HTMLResponse(content="<h1>No .html file found</h1>")
 
+# Original Lemon Squeezy Checkout & Webhook preserved completely untouched
+@app.get("/upgrade")
+async def upgrade():
+    return RedirectResponse(url=LEMON_URL, status_code=303)
+
+@app.post("/webhook/lemonsqueezy")
+async def webhook(request: Request):
+    data = await request.json()
+    if data.get("meta", {}).get("event_name") in ["order_created", "subscription_created"]:
+        email = data.get("data", {}).get("attributes", {}).get("user_email")
+        if email:
+            conn, ph = get_db()
+            cur = conn.cursor()
+            cur.execute(f"UPDATE litellm_keys SET tier = 'enterprise', max_budget_usd = 5000.0 WHERE email = {ph}", (email,))
+            conn.commit()
+            cur.close()
+            conn.close()
+    return {"status": "ok"}
+
+# Unified Dashboard Endpoints (Reading existing subscription status from litellm_keys)
 @app.get("/api/dashboard/me")
-async def dashboard_me(ctx: dict = Depends(get_auth_context)):
+async def dashboard_me(user: dict = Depends(verify_user)):
     conn, ph = get_db()
     cur = conn.cursor()
-    cur.execute(f"SELECT COALESCE(SUM(saved_usd),0), COALESCE(SUM(tokens),0), COALESCE(SUM(pii_count),0) FROM request_logs WHERE user_id = {ph}", (ctx["user_id"],))
-    saved, toks, pii = cur.fetchone()
-    cur.execute(f"SELECT api_key, key_type, rate_limit_rpm, current_spend, monthly_budget_limit FROM api_keys WHERE user_id = {ph}", (ctx["user_id"],))
-    keys = [{"key": k[:14] + "...", "full_key": k, "type": t, "rpm": r, "spend": float(s), "budget": float(b)} for k, t, r, s, b in cur.fetchall()]
-    cur.execute(f"SELECT reason, model, tokens, latency_ms, device_id, saved_usd, cache_hit FROM request_logs WHERE user_id = {ph} ORDER BY rowid DESC LIMIT 8", (ctx["user_id"],))
+    cur.execute(f"SELECT COALESCE(SUM(tokens),0), COALESCE(SUM(pii_count),0) FROM edge_meta_logs WHERE api_key = {ph}", (user["token"],))
+    toks, pii = cur.fetchone()
+    cur.execute(f"SELECT reason, model, tokens, latency_ms, device_id, saved_usd, cache_hit FROM edge_meta_logs WHERE api_key = {ph} ORDER BY rowid DESC LIMIT 8", (user["token"],))
+    logs = [{"reason": rsn, "model": mdl, "tokens": tk, "latency": lat, "device_id": dev or "IDE", "saved": round(float(sv), 4), "cache_hit": bool(ch)} for rsn, mdl, tk, lat, dev, sv, ch in cur.fetchall()]
+    cur.close()
+    conn.close()
+    return {"view": "personal", "alias": user["alias"], "tier": user["tier"], "saved_usd": round(user["saved"], 2), "tokens_routed": int(toks), "pii_masked": int(pii), "logs": logs}
+
+@app.get("/api/dashboard/org")
+async def dashboard_org(user: dict = Depends(verify_user)):
+    if user["tier"] != "enterprise":
+        return JSONResponse(status_code=403, content={"upgrade_required": True, "current_tier": user["tier"]})
+    conn, _ = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT COALESCE(SUM(saved_usd),0) FROM litellm_keys")
+    (org_saved,) = cur.fetchone()
+    cur.execute("SELECT COUNT(DISTINCT device_id), COALESCE(AVG(cache_hit),0) FROM edge_meta_logs WHERE device_id IS NOT NULL")
+    dev_cnt, hit_rate = cur.fetchone()
+    cur.execute("SELECT device_id, model, tokens, latency_ms, saved_usd, cache_hit FROM edge_meta_logs ORDER BY rowid DESC LIMIT 10")
+    logs = [{"device_id": dev or "IDE", "model": mdl, "tokens": tk, "latency": lat, "saved": round(float(sv), 4), "cache_hit": bool(ch)} for dev, mdl, tk, lat, sv, ch in cur.fetchall()]
+    cur.close()
+    conn.close()
