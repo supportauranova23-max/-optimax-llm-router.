@@ -1,27 +1,33 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>OptiMax Quantum | Neural AI Gateway</title>
+<title>OptiMax Quantum | Zero-Retention AI Coding Gateway</title>
 <style>
-*{box-sizing:border-box}body{margin:0;font-family:sans-serif;background:#030712;color:#f1f5f9;display:flex;min-height:100vh}
-.side{width:230px;background:#0a0f1c;border-right:1px solid #1e293b;padding:18px;display:flex;flex-direction:column;justify-content:space-between}
-.logo{font-weight:800;font-size:17px;color:#00f5d4;padding-bottom:14px;border-bottom:1px solid #1e293b}
-.nav{margin-top:14px;display:flex;flex-direction:column;gap:6px}
-.nav button{background:none;border:none;color:#94a3b8;padding:10px;border-radius:8px;text-align:left;font-size:13.5px;font-weight:600;cursor:pointer}
-.nav button.active,.nav button:hover{background:#1e293b;color:#38bdf8}
-.main{flex:1;padding:22px;max-width:1000px;margin:0 auto;width:100%}
-.hero{background:linear-gradient(135deg,#0f172a,#064e3b);border:1px solid #00f5d4;border-radius:12px;padding:18px;margin-bottom:18px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
-.pct{background:#00f5d4;color:#022c22;font-weight:900;padding:3px 9px;border-radius:20px;font-size:12px}
-.panel{display:none;background:#0f172a;border:1px solid #1e293b;border-radius:12px;padding:18px}.panel.active{display:block}
-input,select,textarea{width:100%;padding:10px;border-radius:8px;border:1px solid #334155;background:#030712;color:#fff;margin:6px 0 12px}
-.btn{background:#0284c7;color:#fff;border:none;padding:10px 16px;border-radius:8px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-block;font-size:13px}
-.cta{background:#00f5d4;color:#022c22;font-weight:800}
-.pill{background:#1e293b;border:1px solid #38bdf8;color:#38bdf8;padding:5px 10px;border-radius:20px;font-size:12px;cursor:pointer}
+*{box-sizing:border-box}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#030712;background-image:radial-gradient(circle at 15% 15%,rgba(56,189,248,0.12),transparent 35%),radial-gradient(circle at 85% 80%,rgba(0,245,212,0.1),transparent 35%);color:#f1f5f9;display:flex;min-height:100vh}
+.side{width:240px;background:#0a0f1c;border-right:1px solid rgba(56,189,248,0.2);padding:18px 12px;display:flex;flex-direction:column;justify-content:space-between}
+.logo{font-weight:800;font-size:17px;color:#00f5d4;padding-bottom:14px;border-bottom:1px solid rgba(56,189,248,0.15)}
+.nav{margin-top:14px;display:flex;flex-direction:column;gap:5px}
+.nav button{background:none;border:1px solid transparent;color:#94a3b8;padding:10px 12px;border-radius:8px;text-align:left;font-size:13.5px;font-weight:600;cursor:pointer}
+.nav button.active,.nav button:hover{background:rgba(56,189,248,0.1);border-color:rgba(56,189,248,0.35);color:#38bdf8}
+.main{flex:1;padding:22px;max-width:1080px;margin:0 auto;width:100%}
+.zdr{background:rgba(0,245,212,0.08);border:1px solid rgba(0,245,212,0.4);border-radius:8px;padding:9px 14px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;font-size:12px}
+.roi-banner{display:none;background:linear-gradient(90deg,rgba(245,158,11,0.2),rgba(16,185,129,0.2));border:1px solid #f59e0b;border-radius:10px;padding:12px 16px;margin-bottom:14px;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;font-size:13px}
+.ticker{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
+.t-card{background:#0f172a;border:1px solid rgba(56,189,248,0.22);padding:14px;border-radius:10px}
+.t-card small{color:#94a3b8;font-size:11px;text-transform:uppercase}.t-card div{font-size:20px;font-weight:800;margin-top:4px}
+.panel{display:none;background:#0f172a;border:1px solid rgba(56,189,248,0.2);border-radius:12px;padding:18px}.panel.active{display:block}
+.presets{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.pre-btn{background:#030712;border:1px solid #334155;color:#cbd5e1;padding:9px;border-radius:8px;cursor:pointer;text-align:left;font-size:12px}
+.pre-btn.active{border-color:#00f5d4;background:rgba(0,245,212,0.1);color:#fff}
+input,textarea{width:100%;padding:10px;border-radius:8px;border:1px solid #334155;background:#030712;color:#fff;margin:6px 0 10px;font-size:13px}
+.btn{background:linear-gradient(90deg,#0284c7,#2563eb);color:#fff;border:none;padding:9px 16px;border-radius:8px;font-weight:700;cursor:pointer;text-decoration:none;display:inline-block;font-size:12.5px}
+.cta{background:linear-gradient(90deg,#00f5d4,#10b981);color:#022c22;font-weight:800}
+.ide-tabs{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
 .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:18px}
-.card{background:#0f172a;border:1px solid #1e293b;padding:15px;border-radius:10px}
-pre{background:#020617;border:1px solid #1e293b;padding:14px;border-radius:8px;color:#00f5d4;white-space:pre-wrap;min-height:80px;font-size:12.5px}
-@media(max-width:768px){body{flex-direction:column}.side{width:100%}.nav{flex-direction:row;overflow-x:auto}.grid{grid-template-columns:1fr}}
+.card{background:#0f172a;border:1px solid rgba(56,189,248,0.22);padding:16px;border-radius:10px}
+pre{background:#020617;border:1px solid rgba(0,245,212,0.25);padding:12px;border-radius:8px;color:#00f5d4;white-space:pre-wrap;font-size:12px;margin:8px 0}
+@media(max-width:768px){body{flex-direction:column}.side{width:100%}.nav{flex-direction:row;overflow-x:auto}.ticker,.presets,.grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -29,63 +35,72 @@ pre{background:#020617;border:1px solid #1e293b;padding:14px;border-radius:8px;c
   <div>
     <div class="logo">⚡ OPTIMAX QUANTUM</div>
     <div class="nav">
-      <button id="b-test" class="active" onclick="tab('test',this)">⚡ Playground</button>
-      <button id="b-models" onclick="tab('models',this)">🔍 Models</button>
-      <button id="b-keys" onclick="tab('keys',this)">🔑 Trial Key</button>
-      <button id="b-docs" onclick="tab('docs',this)">🔌 SDK</button>
+      <button id="b-test" class="active" onclick="tab('test',this)">⚡ Neural Playground</button>
+      <button id="b-ide" onclick="tab('ide',this)">🔌 Connect Your IDE</button>
+      <button id="b-trace" onclick="tab('trace',this)">📊 Routing Trace Log</button>
+      <button id="b-keys" onclick="tab('keys',this)">🔑 14-Day Trial Key</button>
     </div>
   </div>
-  <a href="/upgrade?plan=pro" class="btn cta" style="text-align:center">Upgrade Pro ($49)</a>
+  <a href="/upgrade?plan=pro" class="btn cta" style="text-align:center">Upgrade Pro ($49 BYOK)</a>
 </div>
 <div class="main">
-  <div class="hero">
-    <div><h2 style="margin:0 0 5px;font-size:19px">Cut AI & Coding Costs <span class="pct">SAVE UP TO 74.3%</span></h2>
-    <p style="margin:0;color:#cbd5e1;font-size:13px">Auto complexity downgrading + PII masking + semantic caching.</p></div>
-    <button class="btn cta" onclick="tab('keys',document.getElementById('b-keys'))">Get Started Free →</button>
+  <div class="zdr">
+    <span style="color:#00f5d4;font-weight:800">🛡️ Zero-Data-Retention Mode: ACTIVE</span>
+    <span style="color:#cbd5e1">Zero-Payload Logging: Prompt & completion bodies are <b>never</b> stored in PostgreSQL—metadata only.</span>
+  </div>
+  <div id="roiBanner" class="roi-banner">
+    <span id="roiText">🔥 OptiMax saved you $118.40 during your trial—upgrading to the $49/mo plan pays for itself 2.4x over!</span>
+    <a href="/upgrade?plan=pro" class="btn cta">Lock In $49/mo Pro →</a>
+  </div>
+  <div class="ticker">
+    <div class="t-card"><small>Money Saved This Month</small><div id="savVal" style="color:#00f5d4">$118.40</div></div>
+    <div class="t-card"><small>Raw OpenAI / Anthropic Cost</small><div id="rawVal" style="color:#f87171;text-decoration:line-through">$159.35</div></div>
+    <div class="t-card"><small>Effective Cost Reduction</small><div style="color:#38bdf8">-74.3% (BYOK)</div></div>
   </div>
   <div id="test" class="panel active">
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
-      <button class="pill" onclick="setDemo('Write a fast Python binary search function')">💻 Python Code</button>
-      <button class="pill" onclick="setDemo('Draft an invoice reminder for john@acme.com')">🔒 Test PII Masking</button>
-      <button class="pill" onclick="setDemo('Explain quantum computing in 2 sentences')">⚡ Test Cache</button>
+    <div class="presets">
+      <button class="pre-btn active" onclick="setPreset('max_savings',this)"><b>💰 Max Savings (74% Off)</b><br><small style="color:#94a3b8">Gemini Flash / Mini for code</small></button>
+      <button class="pre-btn" onclick="setPreset('balanced',this)"><b>⚖️ Balanced Quality</b><br><small style="color:#94a3b8">Frontier plan + fast execution</small></button>
+      <button class="pre-btn" onclick="setPreset('strict_privacy',this)"><b>🔒 Strict Privacy</b><br><small style="color:#94a3b8">Zero-retention + PII redaction</small></button>
     </div>
-    <input id="key" value="optx_free_trial_user">
-    <select id="mod"><option value="auto">Auto-Route (Cut Costs 74.3%)</option><option value="google/gemini-2.5-flash">Google: Gemini 2.5 Flash</option><option value="meta-llama/llama-3.3-70b-instruct:free">Meta: Llama 3.3 70B (Free)</option></select>
-    <textarea id="prm" rows="3" placeholder="Type a prompt or click a demo pill above..."></textarea>
+    <input id="key" value="optx_free_trial_user" oninput="renderIDE()" placeholder="Virtual API Key">
+    <textarea id="prm" rows="3" placeholder="Paste code or prompt (e.g. Refactor SQL query for user john@bank.com)..."></textarea>
     <button onclick="runAI()" class="btn">Execute Neural Route →</button>
-    <pre id="out">// Quantum telemetry & AI response...</pre>
+    <pre id="out">// Live routing reason, PII redaction count, latency & savings...</pre>
   </div>
-  <div id="models" class="panel">
-    <h3 style="margin-top:0">Search Models</h3>
-    <input id="mSearch" oninput="filterM()" placeholder="Search models (e.g. Gemini, Llama, DeepSeek, Free)...">
-    <div id="mList"></div>
+  <div id="ide" class="panel">
+    <h3 style="margin-top:0">🔌 1-Click IDE Config Generator</h3>
+    <div class="ide-tabs">
+      <button class="btn" onclick="setIDE('cursor')">Cursor</button>
+      <button class="btn" onclick="setIDE('cline')">Cline (VS Code)</button>
+      <button class="btn" onclick="setIDE('windsurf')">Windsurf</button>
+      <button class="btn" onclick="setIDE('continue')">Continue.dev</button>
+    </div>
+    <pre id="ideBox" style="color:#38bdf8"></pre>
+    <button onclick="copyIDE(this)" class="btn cta">📋 Copy IDE Config</button>
+  </div>
+  <div id="trace" class="panel">
+    <h3 style="margin-top:0">📊 Live Metadata Trace Log (Zero Prompt Bodies Stored)</h3>
+    <div id="traceList" style="font-size:13px"></div>
   </div>
   <div id="keys" class="panel">
-    <h3 style="margin-top:0">Get Your 14-Day Free Trial Key</h3>
+    <h3 style="margin-top:0">Start 14-Day Free Trial (BYOK + Managed Sandbox)</h3>
     <form action="/start-trial" method="post">
-      <input name="name" placeholder="Project or Team Name" required>
+      <input name="name" placeholder="Developer or Team Name" required>
       <input name="email" type="email" placeholder="Work Email" required>
-      <button type="submit" class="btn cta">Generate Trial Key →</button>
+      <button type="submit" class="btn cta">Generate Virtual API Key →</button>
     </form>
   </div>
-  <div id="docs" class="panel">
-    <h3 style="margin-top:0">1-Line OpenAI SDK Drop-In</h3>
-    <pre style="color:#38bdf8">from openai import OpenAI
-client = OpenAI(api_key="optx_free_trial_user", base_url="https://onrender.com")</pre>
-  </div>
   <div class="grid">
-    <div class="card"><b>Pro — $49/mo</b><p style="font-size:12px;color:#94a3b8">$500/mo API cap</p><a href="/upgrade?plan=pro" class="btn">Choose Pro ($49)</a></div>
-    <div class="card" style="border-color:#00f5d4"><b>Business Scale — $499/mo</b><p style="font-size:12px;color:#94a3b8">$5,000/mo API cap</p><a href="/upgrade?plan=scale" class="btn cta">Choose Scale ($499)</a></div>
-    <div class="card"><b>Enterprise — $15,000</b><p style="font-size:12px;color:#94a3b8">$100k cap + Custom SLA</p><a href="/upgrade?plan=enterprise" class="btn">Buy Enterprise ($15k)</a></div>
+    <div class="card"><b>Pro BYOK — $49/mo Flat</b><p style="font-size:12px;color:#94a3b8">Plug in your own OpenAI/Gemini/OpenRouter keys with <b>0% token markup</b> + IDE routing.</p><a href="/upgrade?plan=pro" class="btn">Choose Pro ($49)</a></div>
+    <div class="card" style="border-color:#00f5d4"><b>Business Scale — $499/mo</b><p style="font-size:12px;color:#94a3b8">Unlimited team seats • Strict PII X-Ray • Custom routing rules & Slack alerts.</p><a href="/upgrade?plan=scale" class="btn cta">Choose Scale ($499)</a></div>
+    <div class="card"><b>Enterprise — $15,000</b><p style="font-size:12px;color:#94a3b8">Dedicated VPC / Render us-east cluster • SOC2 Zero-Data-Retention SLA.</p><a href="/upgrade?plan=enterprise" class="btn">Buy Enterprise ($15k)</a></div>
   </div>
 </div>
 <script>
-function tab(id,b){document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));document.getElementById(id).classList.add('active');if(b)b.classList.add('active')}
-function setDemo(t){document.getElementById('prm').value=t;runAI()}
-let ALL_M=[];fetch('/v1/models').then(r=>r.json()).then(d=>{ALL_M=d.data||[];filterM()});
-function filterM(){const q=(document.getElementById('mSearch').value||'').toLowerCase();document.getElementById('mList').innerHTML=ALL_M.filter(m=>m.name.toLowerCase().includes(q)||m.id.toLowerCase().includes(q)).map(m=>`<div style='padding:10px;border-bottom:1px solid #1e293b;display:flex;justify-content:space-between'><span><b>${m.name}</b> <small>(${m.in_price})</small></span><button class='btn' style='padding:4px 10px;font-size:12px' onclick="pickM('${m.id}')">Test</button></div>`).join('')}
-function pickM(id){const s=document.getElementById('mod');s.add(new Option(id,id));s.value=id;tab('test',document.getElementById('b-test'))}
-async function runAI(){const o=document.getElementById('out');o.textContent='Routing...';const r=await fetch('/v1/route',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+document.getElementById('key').value.trim()},body:JSON.stringify({prompt:document.getElementById('prm').value,model:document.getElementById('mod').value})});o.textContent=JSON.stringify(await r.json(),null,2)}
-</script>
-</body>
-</html>
+let PRESET='max_savings',CUR_IDE='cursor';
+function tab(id,b){document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));document.getElementById(id).classList.add('active');if(b)b.classList.add('active');loadMeta()}
+function setPreset(p,b){PRESET=p;document.querySelectorAll('.pre-btn').forEach(x=>x.classList.remove('active'));b.classList.add('active')}
+function setIDE(t){CUR_IDE=t;renderIDE()}
+function renderIDE(){const k=document.getElementById('key').value.trim()||'optx_free_trial_user';const u='https://onrender.com cfg={cursor:`{\n  "openai.apiKey": "${k}",\n  "openai.baseUrl": "${u}",\n  "models": ["optimax/max-savings", "optimax/balanced"]\n}`,cline:`{\n  "apiProvider": "openai",\n  "openAiBaseUrl": "${u}",\n  "openAiApiKey": "${k}",\n  "openAiModelId": "optimax/max-savings"\n}`,windsurf:`{\n  "windsurf.customApiUrl": "${u}",\n  "windsurf.apiKey": "${k}"\n}`,continue:`{\n  "models": [{\n    "title": "OptiMax Quantum",\n    "provider": "openai",\n    "model": "optimax/max-savings",\n    "apiBase": "${u}",\n    "apiKey": "${k}"\n  }]\n}`};document.getElementById('ideBox').textContent=cfg[CUR_IDE]}
+function copyIDE(b){navigator.clipboard.writeText(document.getElementById('ideBox').textContent);b.textContent='✓ Copied!';setTimeout(()=>b.textContent='📋 Copy IDE Config',1500)}
