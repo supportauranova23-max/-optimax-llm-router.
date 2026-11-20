@@ -176,3 +176,8 @@ async def dashboard_org(user: dict = Depends(verify_user)):
     logs = [{"device_id": dev or "IDE", "model": mdl, "tokens": tk, "latency": lat, "saved": round(float(sv), 4), "cache_hit": bool(ch)} for dev, mdl, tk, lat, sv, ch in cur.fetchall()]
     cur.close()
     conn.close()
+
+@app.get("/ui.js")
+async def serve_ui_js():
+    with open("ui.js", "r", encoding="utf-8") as f:
+        return HTMLResponse(content=f.read(), media_type="application/javascript")
