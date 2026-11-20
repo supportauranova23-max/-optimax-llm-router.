@@ -4,25 +4,32 @@ let ROLE = 'me';
 function tab(id, b) {
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav button').forEach(x => x.classList.remove('active'));
-  const el = document.getElementById(id);
-  if (el) el.classList.add('active');
+  const target = document.getElementById(id);
+  if (target) target.classList.add('active');
   if (b) b.classList.add('active');
 }
 
 async function switchRole(r) {
   const k = document.getElementById('key').value.trim();
+  const out = document.getElementById('out');
   try {
-    const res = await fetch(r === 'org' ? '/api/dashboard/org' : '/api/dashboard/me', {
-      headers: { 'Authorization': 'Bearer ' + k }
-    });
+    const url = r === 'org' ? '/api/dashboard/org' : '/api/dashboard/me';
+    const res = await fetch(url, { headers: { 'Authorization': 'Bearer ' + k } });
     const d = await res.json();
+    
     if (res.status === 403 && d.upgrade_required) {
       document.getElementById('upModal').style.display = 'flex';
       return;
     }
+    if (!res.ok) {
+      out.textContent = 'API Error (' + res.status + '): ' + (d.detail || JSON.stringify(d));
+      return;
+    }
+
     ROLE = r;
     document.getElementById('sw-me').classList.toggle('active', r === 'me');
     document.getElementById('sw-org').classList.toggle('active', r === 'org');
+
     if (r === 'me') {
       document.getElementById('k1-lbl').textContent = 'Personal Savings';
       document.getElementById('k1-val').textContent = '$' + (d.saved_usd || 0);
@@ -38,15 +45,18 @@ async function switchRole(r) {
       document.getElementById('k3-lbl').textContent = 'Rogue Loops Blocked';
       document.getElementById('k3-val').textContent = d.rogue_loops_blocked || 0;
     }
+
     document.getElementById('logFeed').innerHTML = (d.logs || [])
       .map(l => `<div style='padding:8px;border-bottom:1px solid #1e293b'><b>[${l.device_id}]</b> ${l.model} • ${l.tokens} tok • ${l.latency}ms • <span style='color:#00f5d4'>Saved $${l.saved}</span></div>`)
-      .join('');
+      .join('') || '<p style="color:#94a3b8">No logs recorded yet.</p>';
   } catch (err) {
-    document.getElementById('out').textContent = 'Dashboard Load Error: ' + err.message;
+    out.textContent = 'Network Error: ' + err.message;
   }
 }
 
-function refreshDash() { switchRole(ROLE); }
+function refreshDash() {
+  switchRole(ROLE);
+}
 
 async function genIoTKey() {
   const box = document.getElementById('iotKeyBox');
@@ -57,9 +67,9 @@ async function genIoTKey() {
       headers: { 'Authorization': 'Bearer ' + document.getElementById('key').value.trim() }
     });
     const d = await r.json();
-    box.textContent = r.ok ? ('New IoT Fleet Key (60 RPM Limit): ' + d.api_key) : JSON.stringify(d);
+    box.textContent = r.ok ? ('New IoT Fleet Key (60 RPM Limit): ' + d.api_key) : ('Error: ' + (d.detail || JSON.stringify(d)));
   } catch (err) {
-    box.textContent = 'Error: ' + err.message;
+    box.textContent = 'Network Error: ' + err.message;
   }
 }
 
@@ -75,14 +85,15 @@ async function runIDE() {
       },
       body: JSON.stringify({ prompt: document.getElementById('prm').value })
     });
-    o.textContent = JSON.stringify(await r.json(), null, 2);
-    refreshDash();
+    const d = await r.json();
+    o.textContent = JSON.stringify(d, null, 2);
+    if (r.ok) refreshDash();
   } catch (err) {
     o.textContent = 'Route Error: ' + err.message;
   }
 }
 
-switchRole('me');
+window.addEventListener('DOMContentLoaded', () => switchRole('me'));
 </script>
 </body>
 </html>
