@@ -64,3 +64,172 @@ pre{background:#020617;border:1px solid #1e293b;padding:12px;border-radius:8px;c
     <div class="kpi"><small id="k2-lbl">Tokens Routed</small><div id="k2-val" style="color:#38bdf8">0</div></div>
     <div class="kpi"><small id="k3-lbl">PII Masked</small><div id="k3-val" style="color:#fff">0</div></div>
   </div>
+
+  <div id="play" class="panel active">
+    <div class="presets">
+      <button data-action="preset" data-preset="max_savings" class="pre-btn active"><b>💰 Max Savings (74% Off)</b><br><small style="color:#94a3b8">Gemini Flash / Mini for code</small></button>
+      <button data-action="preset" data-preset="balanced" class="pre-btn"><b>⚖️ Balanced Quality</b><br><small style="color:#94a3b8">Frontier plan + fast execution</small></button>
+      <button data-action="preset" data-preset="strict_privacy" class="pre-btn"><b>🔒 Strict Privacy</b><br><small style="color:#94a3b8">Zero-retention + PII redaction</small></button>
+    </div>
+    <textarea id="prm" rows="3" placeholder="Paste code or prompt (Zero prompt logging enforced)..."></textarea>
+    <button data-action="run-route" class="btn">Execute Neural Route →</button>
+    <pre id="out">// Metadata telemetry & response...</pre>
+  </div>
+  <div id="ide" class="panel">
+    <h3 style="margin-top:0">🔌 1-Click Connect IDE Config Generator</h3>
+    <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+      <button data-action="ide" data-ide="cursor" class="btn">Cursor</button>
+      <button data-action="ide" data-ide="cline" class="btn">Cline (VS Code)</button>
+      <button data-action="ide" data-ide="windsurf" class="btn">Windsurf</button>
+      <button data-action="ide" data-ide="python" class="btn">Python SDK</button>
+    </div>
+    <pre id="ideBox" style="color:#38bdf8"></pre>
+    <button data-action="copy-ide" class="btn cta">📋 Copy Config</button>
+  </div>
+  <div id="iot" class="panel">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <h3 style="margin:0">📡 Edge & IoT Lightweight Gateway (<code>/v1/edge/chat</code>)</h3>
+      <button data-action="gen-iot" class="btn cta">+ Generate IoT Device Key</button>
+    </div>
+    <pre id="iotKeyBox" style="color:#38bdf8">// Click "+ Generate IoT Device Key" or test with key: optx_live_prod_99x1</pre>
+  </div>
+  <div id="logs" class="panel">
+    <h3 style="margin-top:0">📊 Live Zero-Payload Route Trace Log</h3>
+    <div id="logFeed" style="font-size:13px">No traces yet.</div>
+  </div>
+  <div id="keys" class="panel">
+    <h3 style="margin-top:0">🔑 14-Day Free Trial Key</h3>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
+      <input id="trialDisplay" value="optx_free_trial_user" readonly style="margin:0">
+      <button data-action="copy-trial" class="btn">📋 Copy Key</button>
+    </div>
+    <form action="/start-trial" method="post">
+      <input name="name" placeholder="Developer or Team Name" required>
+      <input name="email" type="email" placeholder="Work Email" required>
+      <button type="submit" class="btn cta">Generate New 14-Day Trial Key →</button>
+    </form>
+  </div>
+</div>
+<div id="upModal" class="modal">
+  <div class="modal-box">
+    <h3 style="margin-top:0;color:#00f5d4">🔒 Unlock Team Admin & IoT Fleet View</h3>
+    <p style="font-size:13px;color:#cbd5e1">Your current key is on a <b>Personal / Trial</b> tier. Upgrade via Lemon Squeezy to unlock the <b>Team Admin</b> dashboard.</p>
+    <div style="display:flex;gap:10px;justify-content:center;margin-top:16px">
+      <a href="/upgrade" target="_blank" class="btn cta">Upgrade via Lemon Squeezy →</a>
+      <button data-action="close-modal" class="btn" style="background:#1e293b">Close</button>
+    </div>
+  </div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  let ROLE = 'me', PRESET = 'max_savings', CUR_IDE = 'cursor';
+  const getKey = () => { const el = document.getElementById('key'); return el ? el.value.trim() : 'optx_free_trial_user'; };
+
+  function renderIDE() {
+    const box = document.getElementById('ideBox');
+    if (!box) return;
+    const k = getKey() || 'optx_free_trial_user';
+    const u = 'https://onrender.com';
+    const cfg = {
+      cursor: `{\n  "openai.apiKey": "${k}",\n  "openai.baseUrl": "${u}"\n}`,
+      cline: `{\n  "apiProvider": "openai",\n  "openAiBaseUrl": "${u}",\n  "openAiApiKey": "${k}"\n}`,
+      windsurf: `{\n  "windsurf.customApiUrl": "${u}",\n  "windsurf.apiKey": "${k}"\n}`,
+      python: `from openai import OpenAI\n\nclient = OpenAI(\n    api_key="${k}",\n    base_url="${u}"\n)`
+    };
+    box.textContent = cfg[CUR_IDE] || cfg.cursor;
+  }
+
+  async function switchRole(r) {
+    try {
+      const res = await fetch(r === 'org' ? '/api/dashboard/org' : '/api/dashboard/me', {
+        headers: { 'Authorization': 'Bearer ' + getKey() }
+      });
+      const d = await res.json();
+      if (res.status === 403 && d.upgrade_required) {
+        const m = document.getElementById('upModal');
+        if (m) m.style.display = 'flex';
+        return;
+      }
+      ROLE = r;
+      const swMe = document.getElementById('sw-me'), swOrg = document.getElementById('sw-org');
+      if (swMe) swMe.classList.toggle('active', r === 'me');
+      if (swOrg) swOrg.classList.toggle('active', r === 'org');
+      const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+      setTxt('k1-lbl', r === 'me' ? 'Personal Savings' : 'Org Savings');
+      setTxt('k1-val', '$' + (r === 'me' ? (d.saved_usd || 0) : (d.org_saved_usd || 0)));
+      setTxt('k2-lbl', r === 'me' ? 'Tokens Routed' : 'Active IoT Devices');
+      setTxt('k2-val', r === 'me' ? (d.tokens_routed || 0) : (d.active_iot_devices || 0));
+      setTxt('k3-lbl', r === 'me' ? 'PII Masked' : 'Rogue Loops Blocked');
+      setTxt('k3-val', r === 'me' ? (d.pii_masked || 0) : (d.rogue_loops_blocked || 0));
+      const feed = document.getElementById('logFeed');
+      if (feed) feed.innerHTML = (d.logs || []).map(l => `<div style='padding:8px;border-bottom:1px solid #1e293b'><b>[${l.device_id}]</b> ${l.model} • ${l.tokens} tok • ${l.latency}ms • <span style='color:#00f5d4'>Saved $${l.saved}</span></div>`).join('') || 'No traces yet.';
+    } catch (e) { console.error('[OptiMax] Role Error:', e); }
+  }
+
+  document.addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    const act = btn.dataset.action;
+    console.log('[OptiMax Click Fired]:', act, btn.dataset);
+
+    if (act === 'tab') {
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active'));
+      const target = document.getElementById(btn.dataset.target);
+      if (target) target.classList.add('active');
+      btn.classList.add('active');
+    } else if (act === 'preset') {
+      PRESET = btn.dataset.preset;
+      document.querySelectorAll('.pre-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    } else if (act === 'ide') {
+      CUR_IDE = btn.dataset.ide;
+      renderIDE();
+    } else if (act === 'copy-ide') {
+      const box = document.getElementById('ideBox');
+      if (box) navigator.clipboard.writeText(box.textContent);
+      btn.textContent = '✓ Copied!';
+      setTimeout(() => btn.textContent = '📋 Copy Config', 1500);
+    } else if (act === 'copy-trial') {
+      const td = document.getElementById('trialDisplay');
+      if (td) navigator.clipboard.writeText(td.value);
+      btn.textContent = '✓ Copied!';
+      setTimeout(() => btn.textContent = '📋 Copy Key', 1500);
+    } else if (act === 'role') {
+      await switchRole(btn.dataset.role);
+    } else if (act === 'close-modal') {
+      const m = document.getElementById('upModal');
+      if (m) m.style.display = 'none';
+    } else if (act === 'gen-iot') {
+      const box = document.getElementById('iotKeyBox');
+      if (box) box.textContent = 'Generating IoT Fleet Key...';
+      const r = await fetch('/api/keys/iot', { method: 'POST', headers: { 'Authorization': 'Bearer ' + getKey() } });
+      const d = await r.json();
+      if (box) box.textContent = r.ok ? ('New IoT Key: ' + d.api_key) : JSON.stringify(d);
+    } else if (act === 'run-route') {
+      const out = document.getElementById('out'), prm = document.getElementById('prm');
+      if (out) out.textContent = 'Routing (' + PRESET + ')...';
+      const r = await fetch('/v1/route', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getKey() },
+        body: JSON.stringify({ prompt: prm ? prm.value : '', preset: PRESET })
+      });
+      const d = await r.json();
+      if (out) out.textContent = JSON.stringify(d, null, 2);
+      await switchRole(ROLE);
+    }
+  });
+
+  const keyEl = document.getElementById('key');
+  if (keyEl) keyEl.addEventListener('input', () => {
+    const td = document.getElementById('trialDisplay');
+    if (td) td.value = getKey();
+    renderIDE();
+  });
+
+  renderIDE();
+  switchRole('me');
+});
+</script>
+</body>
+</html>
